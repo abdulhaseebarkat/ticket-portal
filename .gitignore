@@ -1,0 +1,30 @@
+# Secrets - never commit actual .env files, only .env.example templates
+.env
+.env.*
+!.env.example
+
+# WhatsApp bridge's live session - these are the actual cryptographic keys
+# for the linked WhatsApp account. Committing this would let anyone with
+# repo access impersonate that WhatsApp session.
+whatsapp-bridge/auth/
+
+# Backend
+backend/target/
+backend/.idea/
+backend/data/
+backend/run.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/run.log
+
+# WhatsApp bridge
+whatsapp-bridge/node_modules/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log

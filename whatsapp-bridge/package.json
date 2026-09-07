@@ -1,0 +1,19 @@
+{
+  "name": "whatsapp-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Read-only WhatsApp group listener that forwards department complaint groups into the Plant IT Support Portal backend.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "relink": "node -e \"require('fs').rmSync('./auth', { recursive: true, force: true })\" && node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "form-data": "^4.0.0",
+    "pino": "^9.4.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

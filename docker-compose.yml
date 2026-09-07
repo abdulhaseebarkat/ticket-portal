@@ -1,0 +1,52 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: plantit
+      POSTGRES_PASSWORD: plantit
+      POSTGRES_DB: plant_it_support
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: plant_it_support
+      DB_USERNAME: plantit
+      DB_PASSWORD: plantit
+      APP_AUTH_TOKEN_SECRET: demo-secret
+      WHATSAPP_BRIDGE_SECRET: ${WHATSAPP_BRIDGE_SECRET:-demo-bridge-secret}
+      WHATSAPP_MEDIA_PATH: /data/whatsapp-media
+    ports:
+      - '8080:8080'
+    volumes:
+      - whatsapp-media:/data/whatsapp-media
+    depends_on:
+      - postgres
+  whatsapp-bridge:
+    build:
+      context: ./whatsapp-bridge
+    environment:
+      BACKEND_URL: http://backend:8080
+      BRIDGE_SHARED_SECRET: ${WHATSAPP_BRIDGE_SECRET:-demo-bridge-secret}
+    volumes:
+      - whatsapp-bridge-auth:/app/auth
+    depends_on:
+      - backend
+  frontend:
+    build:
+      context: ./frontend
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    ports:
+      - '5173:5173'
+    depends_on:
+      - backend
+volumes:
+  postgres-data:
+  whatsapp-media:
+  whatsapp-bridge-auth:

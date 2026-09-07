@@ -1,0 +1,51 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:plant_it_support}
+    username: ${DB_USERNAME:plantit}
+    password: ${DB_PASSWORD:plantit}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+server:
+  port: 8080
+
+app:
+  auth:
+    # MUST be overridden to a long random value for any real deployment -
+    # anyone who has this can forge a valid login session.
+    token-secret: ${APP_AUTH_TOKEN_SECRET:change-me}
+    token-expiration-minutes: ${APP_AUTH_TOKEN_EXPIRATION_MINUTES:240}
+    # Only used to create the one portal account the first time the app
+    # starts against an empty admin_accounts table. Change the password
+    # afterward from inside the app (Sidebar -> Change Password) rather than
+    # editing this.
+    seed-email: ${APP_AUTH_SEED_EMAIL:it.support@slmtires.com}
+    seed-password: ${APP_AUTH_SEED_PASSWORD:slmtires@123}
+  whatsapp:
+    enabled: ${WHATSAPP_ENABLED:false}
+    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+    business-account-id: ${WHATSAPP_BUSINESS_ACCOUNT_ID:}
+    access-token: ${WHATSAPP_ACCESS_TOKEN:}
+    webhook-verify-token: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:plant_it_webhook_token}
+    # Shared secret the whatsapp-bridge companion service (reads WhatsApp
+    # groups) must send on every request - required, requests are rejected
+    # if this is left blank. Defaults to the same value already used in
+    # whatsapp-bridge/.env.example and docker-compose.yml so a plain restart
+    # (e.g. before a demo) can't accidentally break the bridge by forgetting
+    # to set the env var. Change both sides together for a real deployment.
+    bridge-secret: ${WHATSAPP_BRIDGE_SECRET:demo-bridge-secret}
+    # Local folder complaint image attachments are saved to, served at /media/**
+    media-storage-path: ${WHATSAPP_MEDIA_PATH:./data/whatsapp-media}
+
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO
