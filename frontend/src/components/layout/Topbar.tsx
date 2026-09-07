@@ -1,10 +1,14 @@
 import { Search, Bell, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useBridgeStatus } from '../../hooks/useBridgeStatus';
+import { describeBridgeStatus } from '../../lib/bridgeStatusDisplay';
 
 export function Topbar() {
   const [query, setQuery] = useState('');
   const [now, setNow] = useState(new Date());
   const [showNotifications, setShowNotifications] = useState(false);
+  const { data: bridgeStatus } = useBridgeStatus();
+  const bridgeDisplay = describeBridgeStatus(bridgeStatus);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -32,6 +36,10 @@ export function Topbar() {
             <Bell className="h-5 w-5" />
             {showNotifications && <span className="absolute right-0 top-12 z-40 flex w-56 items-center justify-between rounded-2xl border border-slate-700 bg-slate-900 p-3 text-left text-xs text-slate-300 shadow-xl">No new notifications <X className="h-3 w-3" /></span>}
           </button>
+          <div title={bridgeDisplay.detail || undefined} className="hidden h-11 items-center rounded-2xl bg-slate-900 px-4 text-right text-xs text-slate-300 lg:flex">
+            <span className={`mr-2 h-2.5 w-2.5 rounded-full ${bridgeDisplay.dotClass}`} />
+            <span><strong className="block text-sm font-medium text-slate-200">{bridgeDisplay.label}</strong>WhatsApp</span>
+          </div>
           <div className="hidden h-11 items-center rounded-2xl bg-slate-900 px-4 text-right text-xs text-slate-300 sm:flex">
             <span className="mr-2 h-2.5 w-2.5 rounded-full bg-emerald-400" />
             <span><strong className="block text-sm font-medium text-slate-200">Online</strong>{now.toLocaleTimeString()}</span>

@@ -1,8 +1,10 @@
 package com.plantit.controller;
 
 import com.plantit.config.WhatsAppProperties;
+import com.plantit.dto.bridge.BridgeHeartbeatRequest;
 import com.plantit.dto.bridge.GroupMessagePayload;
 import com.plantit.dto.bridge.GroupSyncRequest;
+import com.plantit.service.BridgeStatusService;
 import com.plantit.service.GroupComplaintIngestionService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -24,10 +26,29 @@ import org.springframework.web.multipart.MultipartFile;
 public class WhatsAppBridgeController {
     private final GroupComplaintIngestionService ingestionService;
     private final WhatsAppProperties properties;
+    private final BridgeStatusService bridgeStatusService;
 
-    public WhatsAppBridgeController(GroupComplaintIngestionService ingestionService, WhatsAppProperties properties) {
+    public WhatsAppBridgeController(GroupComplaintIngestionService ingestionService,
+                                     WhatsAppProperties properties,
+                                     BridgeStatusService bridgeStatusService) {
         this.ingestionService = ingestionService;
         this.properties = properties;
+        this.bridgeStatusService = bridgeStatusService;
+    }
+
+    /**
+     * The bridge calls this roughly every 60s while running, and
+     * immediately on connect/disconnect - lets the portal warn when it's
+     * gone quiet instead of silently missing new complaints.
+     */
+    @PostMapping("/heartbeat")
+    public ResponseEntity<Void> heartbeat(@RequestHeader(value = "X-Bridge-Secret", required = false) String secret,
+                                           @Valid @RequestBody BridgeHeartbeatRequest request) {
+        if (!isAuthorized(secret)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        bridgeStatusService.recordHeartbeat(request.getStatus());
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/groups/sync")

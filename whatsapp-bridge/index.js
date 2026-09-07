@@ -41,6 +41,32 @@ if (!BRIDGE_SECRET) {
     logger.warn('BRIDGE_SHARED_SECRET is not set - the backend will reject every request from this bridge.');
 }
 
+// The portal shows a "bridge disconnected" warning if it hasn't heard from
+// this heartbeat in a few minutes - catches silent failures (a crash, a
+// lost network, a phone-side logout) that would otherwise just look like
+// "no new complaints" with nothing telling anyone why.
+const HEARTBEAT_INTERVAL_MS = 60 * 1000;
+let currentlyConnected = false;
+
+async function sendHeartbeat(status) {
+    try {
+        await axios.post(
+            `${BACKEND_URL}/api/whatsapp/bridge/heartbeat`,
+            { status },
+            { headers: { 'X-Bridge-Secret': BRIDGE_SECRET }, timeout: 10000 }
+        );
+    } catch (err) {
+        logger.error({ err: err.message }, 'Failed to send heartbeat to the backend');
+    }
+}
+
+// Set up once at module scope (not inside start()) so reconnects don't stack up duplicate intervals.
+setInterval(() => {
+    if (currentlyConnected) {
+        sendHeartbeat('connected');
+    }
+}, HEARTBEAT_INTERVAL_MS);
+
 async function start() {
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
@@ -62,13 +88,17 @@ async function start() {
 
         if (connection === 'open') {
             logger.info('WhatsApp bridge connected.');
+            currentlyConnected = true;
+            await sendHeartbeat('connected');
             await syncGroups(sock);
         }
 
         if (connection === 'close') {
+            currentlyConnected = false;
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const loggedOut = statusCode === DisconnectReason.loggedOut;
             logger.warn({ statusCode }, 'Connection closed.');
+            await sendHeartbeat(loggedOut ? 'logged_out' : 'disconnected');
             if (loggedOut) {
                 logger.error(`Session logged out - delete ${AUTH_DIR} and restart to re-link with a fresh QR code.`);
             } else {

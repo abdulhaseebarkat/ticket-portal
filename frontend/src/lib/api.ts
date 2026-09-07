@@ -54,6 +54,17 @@ export const changePassword = async (currentPassword: string, newPassword: strin
   return response.data as { message: string };
 };
 
+export const fetchBridgeStatus = async () => {
+  const response = await api.get('/whatsapp/bridge-status');
+  return response.data as {
+    connected: boolean;
+    stale: boolean;
+    status: string;
+    lastHeartbeatAt: string | null;
+    minutesSinceLastHeartbeat: number | null;
+  };
+};
+
 export const fetchDashboardSummary = async () => {
   const response = await api.get('/dashboard/summary');
   return response.data;
