@@ -2,6 +2,7 @@ version: '3.9'
 services:
   postgres:
     image: postgres:15-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: plantit
       POSTGRES_PASSWORD: plantit
@@ -13,13 +14,20 @@ services:
   backend:
     build:
       context: ./backend
+    restart: unless-stopped
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: plant_it_support
       DB_USERNAME: plantit
       DB_PASSWORD: plantit
-      APP_AUTH_TOKEN_SECRET: demo-secret
+      # Real random value - MUST be overridden (via a real .env file, never
+      # committed) for any deployment beyond local testing. Generate your
+      # own with, e.g., PowerShell:
+      #   $b=New-Object byte[] 48; (New-Object Security.Cryptography.RNGCryptoServiceProvider).GetBytes($b); [Convert]::ToBase64String($b)
+      APP_AUTH_TOKEN_SECRET: ${APP_AUTH_TOKEN_SECRET:-Lgq2H9uKMg/cjQaHgYvyVUMQaxDYmUhGubAuiwvkumQxa5am/0vwgpmKYI8c/3mG}
+      APP_AUTH_SEED_EMAIL: ${APP_AUTH_SEED_EMAIL:-it.support@slmtires.com}
+      APP_AUTH_SEED_PASSWORD: ${APP_AUTH_SEED_PASSWORD:-slmtires@123}
       WHATSAPP_BRIDGE_SECRET: ${WHATSAPP_BRIDGE_SECRET:-demo-bridge-secret}
       WHATSAPP_MEDIA_PATH: /data/whatsapp-media
     ports:
@@ -31,6 +39,7 @@ services:
   whatsapp-bridge:
     build:
       context: ./whatsapp-bridge
+    restart: unless-stopped
     environment:
       BACKEND_URL: http://backend:8080
       BRIDGE_SHARED_SECRET: ${WHATSAPP_BRIDGE_SECRET:-demo-bridge-secret}
@@ -41,9 +50,9 @@ services:
   frontend:
     build:
       context: ./frontend
-    command: npm run dev -- --host 0.0.0.0 --port 5173
+    restart: unless-stopped
     ports:
-      - '5173:5173'
+      - '5173:80'
     depends_on:
       - backend
 volumes:
