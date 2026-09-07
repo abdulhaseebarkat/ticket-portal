@@ -107,6 +107,18 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <!-- This project doesn't inherit from spring-boot-starter-parent (it only
+                     imports the BOM), so the "repackage" goal isn't bound to the package
+                     phase automatically - without this, `mvn package` produces a plain thin
+                     jar with no Main-Class manifest entry, and `java -jar app.jar` fails
+                     with "no main manifest attribute". -->
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
