@@ -16,6 +16,14 @@ public class MockClassificationProvider implements ComplaintClassificationProvid
     private static final Pattern EQUIPMENT_CODE_PATTERN = Pattern.compile("\\b([A-Z]{2,}-\\d+)\\b");
     // Matches "Zone A" / "Zone B" / "zone c" etc.
     private static final Pattern ZONE_LETTER_PATTERN = Pattern.compile("(?i)\\bzone\\s*([a-d])\\b");
+    // Generic "something is broken" language that doesn't name a specific
+    // category keyword - e.g. the real backfilled complaint "...production
+    // Stopped due to Booking MES System not working..." matches "stopped"
+    // and "not working" even though it never says scanner/hmi/printer/etc.
+    private static final Pattern PROBLEM_LANGUAGE_PATTERN = Pattern.compile(
+            "(?i)not working|not printing|not scanning|no internet|no network|stopped|shut down|broken"
+                    + "|error|fault|hang(ing|ed)?|\\bissue\\b|\\bproblem\\b|complaint|crash(ed|ing)?|failed|failure"
+                    + "|band ho|band hai|kaam nahi|kharab|kharaab|masla|bandh");
 
     @Override
     public ClassificationResult classifyMessage(String message) {
@@ -85,7 +93,25 @@ public class MockClassificationProvider implements ComplaintClassificationProvid
             confidence = 0.94;
         }
 
+        // A message defaults to NEW_COMPLAINT unless a status keyword
+        // overrides it above - but that default is too eager on its own: a
+        // category keyword only fires for specific IT terms, so genuinely
+        // unrelated chatter ("how are you", "feeling down") never matches
+        // anything and would otherwise fall through to NEW_COMPLAINT by
+        // default. Require some actual signal this is IT-related before
+        // trusting that default: a recognized category, an equipment
+        // reference, or generic "something is broken" language.
+        if (intent.equals("NEW_COMPLAINT")) {
+            boolean hasCategorySignal = !"Other".equals(category);
+            boolean hasEquipmentSignal = equipmentReference != null;
+            boolean hasProblemLanguage = PROBLEM_LANGUAGE_PATTERN.matcher(message).find();
+            if (!hasCategorySignal && !hasEquipmentSignal && !hasProblemLanguage) {
+                intent = "IRRELEVANT";
+            }
+        }
+
         // Only create new complaints for actual complaints, not status updates
+        // (or irrelevant chatter, which never becomes a complaint at all).
         boolean isComplaintMessage = intent.equals("NEW_COMPLAINT");
 
         return ClassificationResult.builder()

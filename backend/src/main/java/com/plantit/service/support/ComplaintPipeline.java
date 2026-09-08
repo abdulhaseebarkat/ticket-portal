@@ -51,6 +51,15 @@ public class ComplaintPipeline {
         // like a brand new complaint (e.g. a generic "OK Now" reply).
         Optional<Complaint> target = correlationService.resolveByQuotedMessage(ctx.getQuotedExternalMessageId());
 
+        // Casual chatter with no IT-complaint signal at all, and not a reply
+        // to any existing complaint thread, has nothing to do with any
+        // complaint - stop here rather than letting resolveByContext's
+        // generic-reply fallback wrongly attach it to whatever else happens
+        // to be open (the raw message is still stored for audit either way).
+        if (target.isEmpty() && "IRRELEVANT".equals(classification.getIntent())) {
+            return Optional.empty();
+        }
+
         if (target.isEmpty() && !classification.isComplaint()) {
             target = correlationService.resolveByContext(
                     ctx.getGroup(), classification.getEquipmentReference(), classification.getLocationHint(), classification.getCategory());
