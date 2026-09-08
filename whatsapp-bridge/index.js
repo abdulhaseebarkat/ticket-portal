@@ -101,6 +101,13 @@ async function start() {
         if (qr) {
             logger.info('Scan this QR code from the dedicated WhatsApp number (Linked Devices -> Link a Device):');
             qrcode.generate(qr, { small: true });
+            // Without this, the portal keeps showing whatever the *last*
+            // session's status was (often "connected") for up to 3 minutes
+            // after a relink starts, since nothing had told it otherwise -
+            // misleadingly implying it's still working when it's actually
+            // sitting here waiting to be scanned.
+            currentlyConnected = false;
+            await sendHeartbeat('awaiting_scan');
         }
 
         if (connection === 'open') {
@@ -143,7 +150,14 @@ async function start() {
         }
     });
 
-    sock.ev.on('messaging-history.set', async ({ messages }) => {
+    sock.ev.on('messaging-history.set', async ({ messages, syncType, isLatest }) => {
+        // Always log this event firing at all, even with nothing usable in
+        // it - otherwise "fired but found nothing in range" and "never
+        // fired" are indistinguishable from the logs afterward.
+        logger.info(
+            { syncType, isLatest, rawMessageCount: messages ? messages.length : 0 },
+            'Received a history sync batch from WhatsApp.'
+        );
         if (!messages || messages.length === 0) {
             return;
         }
@@ -161,19 +175,20 @@ async function start() {
 async function backfillHistory(messages) {
     const cutoff = Date.now() - HISTORY_BACKFILL_HOURS * 60 * 60 * 1000;
 
-    const candidates = messages
-        .filter((message) => (message.key.remoteJid || '').endsWith('@g.us'))
-        .filter((message) => !message.key.fromMe)
-        .filter((message) => Boolean(message.message))
-        .map((message) => ({ message, timestampMs: toEpochMillis(message.messageTimestamp) }))
+    const groupMessages = messages.filter((message) => (message.key.remoteJid || '').endsWith('@g.us') && !message.key.fromMe && message.message);
+    const withTimestamp = groupMessages.map((message) => ({ message, timestampMs: toEpochMillis(message.messageTimestamp) }));
+    const candidates = withTimestamp
         .filter(({ timestampMs }) => timestampMs !== null && timestampMs >= cutoff)
         .sort((a, b) => a.timestampMs - b.timestampMs);
+
+    logger.info(
+        { totalReceived: messages.length, groupMessages: groupMessages.length, withinWindow: candidates.length, windowHours: HISTORY_BACKFILL_HOURS },
+        'History backfill batch summary.'
+    );
 
     if (candidates.length === 0) {
         return;
     }
-
-    logger.info(`History backfill: found ${candidates.length} group message(s) from the last ${HISTORY_BACKFILL_HOURS}h to replay.`);
 
     let forwarded = 0;
     for (const { message, timestampMs } of candidates) {

@@ -23,6 +23,14 @@ export function describeBridgeStatus(status: BridgeStatus | undefined): BridgeSt
   if (status.connected) {
     return { label: 'Bridge connected', detail: '', dotClass: 'bg-emerald-400', isProblem: false };
   }
+  if (status.status === 'awaiting_scan') {
+    return {
+      label: 'Waiting for QR scan',
+      detail: 'The bridge is relinking - scan the QR code in its logs (docker compose logs -f whatsapp-bridge).',
+      dotClass: 'bg-amber-400',
+      isProblem: true,
+    };
+  }
   if (status.stale) {
     const minutes = status.minutesSinceLastHeartbeat ?? 0;
     return {
