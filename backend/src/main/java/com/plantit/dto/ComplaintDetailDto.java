@@ -17,9 +17,12 @@ public class ComplaintDetailDto {
     private String priority;
     private String status;
     private String category;
+    private Long categoryId;
     private String equipment;
+    private Long equipmentId;
     private String equipmentReference;
     private String location;
+    private Long locationId;
     private String reporter;
     private String group;
     private Double confidence;

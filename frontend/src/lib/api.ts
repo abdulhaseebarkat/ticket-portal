@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { ComplaintUpdatePayload, ReferenceOption, EquipmentOption } from '../types/complaint';
 
 const TOKEN_KEY = 'plantit-token';
 const EMAIL_KEY = 'plantit-email';
@@ -82,6 +83,26 @@ export const fetchComplaintDetail = async (id: number) => {
 export const fetchAllComplaints = async () => {
   const response = await api.get('/complaints');
   return response.data;
+};
+
+export const updateComplaint = async (id: number, payload: ComplaintUpdatePayload) => {
+  const response = await api.patch(`/complaints/${id}`, payload);
+  return response.data;
+};
+
+export const fetchCategories = async () => {
+  const response = await api.get('/categories');
+  return response.data as ReferenceOption[];
+};
+
+export const fetchLocations = async () => {
+  const response = await api.get('/locations');
+  return response.data as ReferenceOption[];
+};
+
+export const fetchEquipmentOptions = async () => {
+  const response = await api.get('/equipment');
+  return response.data as EquipmentOption[];
 };
 
 export const fetchEmployees = async () => {
