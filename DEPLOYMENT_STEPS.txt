@@ -1,0 +1,228 @@
+PLANT IT SUPPORT PORTAL - DEPLOYMENT GUIDE
+============================================
+Written: 2026-09-08
+Covers: taking the app from this dev machine to a real, live server.
+
+Current status at time of writing:
+  - Code is on GitHub: https://github.com/abdulhaseebarkat/ticket-portal
+    (private repo, "master" branch, pushed and up to date)
+  - App runs correctly via Docker Compose (verified end-to-end on this
+    dev machine: login, WhatsApp bridge, complaint pipeline, editing,
+    reference-data management all tested and working)
+  - NOT yet done: choosing a server, HTTPS, production secrets,
+    backups, final WhatsApp relink on the server
+
+
+===========================================================
+STEP 1 - CHOOSE A SERVER
+===========================================================
+You need a machine that is:
+  - Always on, with a stable network connection
+  - Linux (Ubuntu 22.04 or 24.04 LTS recommended - most guides and
+    package support target Ubuntu)
+  - At least 2GB RAM, 20GB disk (this app is lightweight)
+  - Has (or can get) a static/reserved IP address
+
+Two realistic options:
+
+  Option A - Small VPS (recommended for simplicity)
+    Providers: DigitalOcean, Hetzner, Linode, AWS Lightsail
+    Cost: roughly $5-12/month for a small instance
+    You get: a public IP immediately, easy to reinstall/rebuild if
+    something goes wrong, provider handles the physical hardware
+
+  Option B - An on-prem PC at the plant
+    Cost: no monthly fee, but:
+      - needs a static IP or Dynamic DNS (e.g. DuckDNS, No-IP) if your
+        ISP doesn't give you a fixed IP
+      - someone is responsible for it physically staying on, powered,
+        and network-connected
+      - router port-forwarding needed if it's behind NAT
+
+Once you have SSH access to whichever one you pick, the rest of these
+steps are the same.
+
+
+===========================================================
+STEP 2 - INSTALL DOCKER ON THE SERVER
+===========================================================
+SSH into the server, then (Ubuntu):
+
+  curl -fsSL https://get.docker.com | sh
+  sudo usermod -aG docker $USER
+
+Log out and back in (or run `newgrp docker`) so the docker group
+membership takes effect without needing sudo for every command.
+
+Verify:
+  docker --version
+  docker compose version
+
+
+===========================================================
+STEP 3 - CLONE THE REPOSITORY
+===========================================================
+  git clone https://github.com/abdulhaseebarkat/ticket-portal.git
+  cd ticket-portal
+
+(If the repo is private, you'll need to authenticate - either set up
+an SSH deploy key on GitHub, or use a Personal Access Token when
+prompted for the password.)
+
+
+===========================================================
+STEP 4 - CREATE REAL PRODUCTION SECRETS
+===========================================================
+docker-compose.yml has safe-for-local-testing DEFAULT values baked in
+(a real random JWT secret, but a weak bridge secret:
+"demo-bridge-secret", and the seeded login password). These defaults
+must be overridden for a real deployment.
+
+Create a file named exactly `.env` in the project root (same folder as
+docker-compose.yml). This file is already git-ignored - never commit
+it.
+
+  # Generate a strong random secret for each of these, e.g. with:
+  #   openssl rand -base64 48
+  APP_AUTH_TOKEN_SECRET=<paste a generated random value here>
+  WHATSAPP_BRIDGE_SECRET=<paste a different generated random value here>
+
+  # Keep the same login email, or change it if you want:
+  APP_AUTH_SEED_EMAIL=it.support@slmtires.com
+  # Set a real password here for the FIRST login only - change it
+  # immediately after logging in via the app's own "Change Password"
+  # option, not by editing this file again later (this only seeds the
+  # account once, on an empty database).
+  APP_AUTH_SEED_PASSWORD=<a real password>
+
+  # Optional: how far back the WhatsApp history backfill reaches on a
+  # fresh link (hours). Default is 48 if you omit this.
+  WHATSAPP_HISTORY_BACKFILL_HOURS=48
+
+Docker Compose automatically reads a `.env` file in the same directory
+- no extra flag needed.
+
+
+===========================================================
+STEP 5 - SET UP A DOMAIN AND HTTPS
+===========================================================
+Running over plain HTTP is fine for local testing, not for a real
+deployment - the login token would travel unencrypted.
+
+5a. Point DNS at the server
+    In your domain registrar (or subdomain provider), create an A
+    record pointing e.g. itportal.yourcompany.com at the server's
+    public IP address. Wait for it to propagate (can take a few
+    minutes to a few hours).
+
+5b. Add a reverse proxy for automatic HTTPS
+    The simplest option for a small setup like this is Caddy - it
+    gets and renews a free Let's Encrypt certificate automatically
+    with almost no configuration.
+
+    This needs a small addition to docker-compose.yml: a `caddy`
+    service in front of the `frontend` service, plus a Caddyfile with
+    something like:
+
+      itportal.yourcompany.com {
+          reverse_proxy frontend:80
+      }
+
+    Ask Claude to add this once you have a real domain pointed at the
+    server - it's a quick addition, but needs the actual domain name
+    to configure correctly.
+
+
+===========================================================
+STEP 6 - BRING THE STACK UP
+===========================================================
+From the project root on the server:
+
+  docker compose up -d --build
+
+Same command used throughout local testing. Check everything started
+cleanly:
+
+  docker compose ps
+
+All four services (postgres, backend, whatsapp-bridge, frontend)
+should show "Up", not "Restarting".
+
+
+===========================================================
+STEP 7 - RELINK WHATSAPP ON THE SERVER
+===========================================================
+The WhatsApp bridge's session lives in a Docker volume tied to THIS
+machine - it does not carry over from the dev machine automatically.
+You will need to link it here, one more time, the same way as before:
+
+  docker compose logs -f whatsapp-bridge
+
+Scan the QR code shown from the dedicated plant IT WhatsApp number
+(the one that's a member of the 4 real zone groups: Zone A MES Issues,
+TBM & CUTTER MES COMPLAINS GROUP, MES System Curing, Mixing and IT
+collaboration). Once connected, turn monitoring on for each of those 4
+groups from the "WhatsApp Groups" page in the app, same as before.
+
+
+===========================================================
+STEP 8 - SET UP DATABASE BACKUPS
+===========================================================
+Docker volumes survive container restarts, but not a disk failure.
+A simple daily backup via cron is enough at this scale:
+
+  # Add to crontab (crontab -e) - runs daily at 2am, keeps 14 days:
+  0 2 * * * docker exec ticket-portal-postgres-1 pg_dump -U plantit plant_it_support | gzip > /path/to/backups/plantit-$(date +\%Y\%m\%d).sql.gz
+  0 3 * * * find /path/to/backups -name "plantit-*.sql.gz" -mtime +14 -delete
+
+Copy those backup files somewhere off the server periodically too (a
+cloud storage bucket, or even just downloading them occasionally) - a
+backup that only lives on the same disk as the database doesn't
+protect against that disk failing.
+
+
+===========================================================
+STEP 9 - FINAL CHECKS
+===========================================================
+  [ ] Log in at https://itportal.yourcompany.com with the real account
+  [ ] Change the password from the seeded default (Sidebar -> Change
+      Password)
+  [ ] Confirm the WhatsApp bridge status pill shows "Bridge connected"
+  [ ] Send a real test message in one of the 4 zone groups and confirm
+      it appears as a complaint on the dashboard
+  [ ] Confirm HTTPS is working (padlock in the browser, no warnings)
+  [ ] Confirm the backup cron job ran successfully after its first
+      scheduled time
+
+
+===========================================================
+MAKING CHANGES AFTER DEPLOYMENT
+===========================================================
+The three-copies model:
+  1. Dev machine (this one) - where changes get written and tested
+  2. GitHub (the remote hub) - `git push` sends changes there
+  3. Server - pulls from GitHub and rebuilds
+
+To ship a change after deployment:
+  On the dev machine:
+    git add -A
+    git commit -m "..."
+    git push
+
+  On the server:
+    cd ticket-portal
+    git pull
+    docker compose up -d --build
+
+That's the whole update cycle - no need to re-copy files manually.
+
+
+===========================================================
+THINGS DELIBERATELY LEFT OUT OF THIS GUIDE
+===========================================================
+  - Automated tests / CI pipeline - not set up yet, out of scope here
+  - Monitoring/alerting beyond the WhatsApp bridge's own disconnect
+    heartbeat (already built into the app) - could be added later
+    (e.g. uptime checks, error tracking) if it becomes a priority
+  - Multi-server / high-availability setup - unnecessary at this
+    scale (single admin account, one plant)
