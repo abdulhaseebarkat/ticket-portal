@@ -1,5 +1,13 @@
 import axios from 'axios';
-import type { ComplaintUpdatePayload, ReferenceOption, EquipmentOption } from '../types/complaint';
+import type {
+  ComplaintUpdatePayload,
+  ReferenceOption,
+  EquipmentOption,
+  CategoryRecord,
+  CategoryRequest,
+  EquipmentRecord,
+  EquipmentRequest,
+} from '../types/complaint';
 
 const TOKEN_KEY = 'plantit-token';
 const EMAIL_KEY = 'plantit-email';
@@ -103,6 +111,36 @@ export const fetchLocations = async () => {
 export const fetchEquipmentOptions = async () => {
   const response = await api.get('/equipment');
   return response.data as EquipmentOption[];
+};
+
+export const fetchCategoryRecords = async () => {
+  const response = await api.get('/categories');
+  return response.data as CategoryRecord[];
+};
+
+export const createCategory = async (payload: CategoryRequest) => {
+  const response = await api.post('/categories', payload);
+  return response.data as CategoryRecord;
+};
+
+export const updateCategory = async (id: number, payload: CategoryRequest) => {
+  const response = await api.patch(`/categories/${id}`, payload);
+  return response.data as CategoryRecord;
+};
+
+export const fetchEquipmentRecords = async () => {
+  const response = await api.get('/equipment');
+  return response.data as EquipmentRecord[];
+};
+
+export const createEquipment = async (payload: EquipmentRequest) => {
+  const response = await api.post('/equipment', payload);
+  return response.data as EquipmentRecord;
+};
+
+export const updateEquipment = async (id: number, payload: EquipmentRequest) => {
+  const response = await api.patch(`/equipment/${id}`, payload);
+  return response.data as EquipmentRecord;
 };
 
 export const fetchEmployees = async () => {

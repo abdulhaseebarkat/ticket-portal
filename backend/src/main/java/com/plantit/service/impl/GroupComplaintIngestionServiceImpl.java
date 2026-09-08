@@ -4,6 +4,7 @@ import com.plantit.dto.bridge.GroupMessagePayload;
 import com.plantit.dto.bridge.GroupSyncItem;
 import com.plantit.entity.Complaint;
 import com.plantit.entity.Employee;
+import com.plantit.entity.Equipment;
 import com.plantit.entity.WhatsAppGroup;
 import com.plantit.entity.WhatsAppMessage;
 import com.plantit.integration.ai.ComplaintClassificationProvider;
@@ -11,6 +12,7 @@ import com.plantit.integration.ai.model.ClassificationResult;
 import com.plantit.repository.ComplaintEventRepository;
 import com.plantit.repository.ComplaintMessageRepository;
 import com.plantit.repository.ComplaintRepository;
+import com.plantit.repository.EquipmentRepository;
 import com.plantit.repository.WhatsAppGroupRepository;
 import com.plantit.repository.WhatsAppMessageRepository;
 import com.plantit.service.GroupComplaintIngestionService;
@@ -25,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,6 +45,7 @@ public class GroupComplaintIngestionServiceImpl implements GroupComplaintIngesti
     private final EmployeeLookupService employeeLookupService;
     private final ComplaintPipeline complaintPipeline;
     private final MediaStorageService mediaStorageService;
+    private final EquipmentRepository equipmentRepository;
 
     public GroupComplaintIngestionServiceImpl(
             WhatsAppGroupRepository groupRepository,
@@ -52,7 +56,8 @@ public class GroupComplaintIngestionServiceImpl implements GroupComplaintIngesti
             ComplaintClassificationProvider classificationProvider,
             EmployeeLookupService employeeLookupService,
             ComplaintPipeline complaintPipeline,
-            MediaStorageService mediaStorageService) {
+            MediaStorageService mediaStorageService,
+            EquipmentRepository equipmentRepository) {
         this.groupRepository = groupRepository;
         this.messageRepository = messageRepository;
         this.complaintRepository = complaintRepository;
@@ -62,6 +67,7 @@ public class GroupComplaintIngestionServiceImpl implements GroupComplaintIngesti
         this.employeeLookupService = employeeLookupService;
         this.complaintPipeline = complaintPipeline;
         this.mediaStorageService = mediaStorageService;
+        this.equipmentRepository = equipmentRepository;
     }
 
     @Override
@@ -188,6 +194,7 @@ public class GroupComplaintIngestionServiceImpl implements GroupComplaintIngesti
         Optional<Employee> employee = employeeLookupService.findByPhoneNumber(message.getSenderWhatsapp());
         String text = message.getMessageText() != null ? message.getMessageText() : "";
         ClassificationResult classification = classificationProvider.classifyMessage(text);
+        enrichWithKnownEquipmentName(classification, text);
         String senderLabel = employee.map(Employee::getName)
                 .orElse(message.getSenderName() != null && !message.getSenderName().isBlank() ? message.getSenderName() : message.getSenderWhatsapp());
 
@@ -203,5 +210,31 @@ public class GroupComplaintIngestionServiceImpl implements GroupComplaintIngesti
                 .now(now)
                 .complaintNumberPrefix(COMPLAINT_NUMBER_PREFIX)
                 .build());
+    }
+
+    /**
+     * The classifier only recognizes coded equipment ("TB-024") or generic
+     * type+number phrases ("scanner #12") via fixed regex - a named system
+     * that's neither, like "Booking MES System", never matches those
+     * patterns no matter how many times it's added to the equipment
+     * catalog. This fills that gap: if the classifier found nothing, check
+     * whether the message actually names a piece of equipment that's
+     * already in the catalog, so a name added there gets recognized in
+     * every future message that mentions it, not just this one.
+     */
+    private void enrichWithKnownEquipmentName(ClassificationResult classification, String text) {
+        if (classification.getEquipmentReference() != null && !classification.getEquipmentReference().isBlank()) {
+            return;
+        }
+        String normalizedText = text.toLowerCase();
+        equipmentRepository.findAll().stream()
+                .filter(Equipment::isActive)
+                .filter(equipment -> equipment.getName() != null && !equipment.getName().isBlank())
+                .filter(equipment -> normalizedText.contains(equipment.getName().toLowerCase()))
+                // If multiple known equipment names appear, the longest one
+                // is the more specific match (e.g. prefer "Curing HMI 04"
+                // over a shorter unrelated partial name).
+                .max(Comparator.comparingInt(equipment -> equipment.getName().length()))
+                .ifPresent(equipment -> classification.setEquipmentReference(equipment.getName()));
     }
 }

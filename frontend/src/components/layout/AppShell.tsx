@@ -5,6 +5,7 @@ import WhatsAppSimulatorPage from '../../pages/WhatsAppSimulatorPage';
 import GroupsPage from '../../pages/GroupsPage';
 import ComplaintsPage from '../../pages/ComplaintsPage';
 import AnalyticsPage from '../../pages/AnalyticsPage';
+import ReferenceDataPage from '../../pages/ReferenceDataPage';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { useBridgeStatus } from '../../hooks/useBridgeStatus';
@@ -35,6 +36,7 @@ export function AppShell() {
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/complaints" element={<ComplaintsPage />} />
               <Route path="/groups" element={<GroupsPage />} />
+              <Route path="/reference-data" element={<ReferenceDataPage />} />
               <Route path="/simulator" element={<WhatsAppSimulatorPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

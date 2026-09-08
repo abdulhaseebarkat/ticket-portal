@@ -1,11 +1,11 @@
 package com.plantit.controller;
 
 import com.plantit.dto.CategoryDto;
+import com.plantit.dto.CategoryRequest;
 import com.plantit.service.CategoryService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -21,5 +21,15 @@ public class CategoryController {
     @GetMapping
     public ResponseEntity<List<CategoryDto>> list() {
         return ResponseEntity.ok(categoryService.listAll());
+    }
+
+    @PostMapping
+    public ResponseEntity<CategoryDto> create(@Valid @RequestBody CategoryRequest request) {
+        return ResponseEntity.ok(categoryService.create(request));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<CategoryDto> update(@PathVariable Long id, @Valid @RequestBody CategoryRequest request) {
+        return ResponseEntity.ok(categoryService.update(id, request));
     }
 }

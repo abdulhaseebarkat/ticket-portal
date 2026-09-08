@@ -44,6 +44,32 @@ export interface EquipmentOption extends ReferenceOption {
   equipmentCode: string;
 }
 
+export interface CategoryRecord extends ReferenceOption {
+  description?: string | null;
+}
+
+export interface CategoryRequest {
+  name: string;
+  description: string | null;
+  active: boolean;
+}
+
+export interface EquipmentRecord extends ReferenceOption {
+  equipmentCode: string;
+  type?: string | null;
+}
+
+export interface EquipmentRequest {
+  equipmentCode: string;
+  name: string;
+  type: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  locationId: number | null;
+  department: string | null;
+  active: boolean;
+}
+
 /** Sent as-is on save - null on categoryId/equipmentId/locationId means "unassign". */
 export interface ComplaintUpdatePayload {
   title: string;
