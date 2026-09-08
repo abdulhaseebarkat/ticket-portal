@@ -56,6 +56,17 @@ public class ComplaintPipeline {
                     ctx.getGroup(), classification.getEquipmentReference(), classification.getLocationHint(), classification.getCategory());
         }
 
+        // An explicit reopen signal ("still not working") with nothing
+        // currently open to attach to gets one more, narrower chance: the
+        // same equipment, recently marked resolved. Deliberately not
+        // extended to resolveByContext's broader zone/category tiers - only
+        // an equipment code is specific enough to trust against an already
+        // closed complaint.
+        if (target.isEmpty() && "REOPENED".equals(classification.getIntent())) {
+            target = correlationService.resolveRecentlyResolvedByEquipment(
+                    ctx.getGroup(), classification.getEquipmentReference(), ctx.getNow());
+        }
+
         if (target.isPresent()) {
             Complaint complaint = target.get();
             linkMessage(complaint, ctx);

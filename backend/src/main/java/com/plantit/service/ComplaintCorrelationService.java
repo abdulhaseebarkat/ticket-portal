@@ -3,6 +3,7 @@ package com.plantit.service;
 import com.plantit.entity.Complaint;
 import com.plantit.entity.WhatsAppGroup;
 
+import java.time.OffsetDateTime;
 import java.util.Optional;
 
 /**
@@ -28,4 +29,17 @@ public interface ComplaintCorrelationService {
      * "done" with no identifying keyword).
      */
     Optional<Complaint> resolveByContext(WhatsAppGroup group, String equipmentReference, String locationHint, String category);
+
+    /**
+     * A message with an explicit reopen signal ("still not working", "abhi
+     * bhi kharab hai") that isn't a reply and doesn't match any currently
+     * open complaint deserves one more, narrower check before it's treated
+     * as a brand new report: was this exact equipment marked resolved
+     * recently? Deliberately narrower than resolveByContext - only the
+     * equipment reference is trusted here (not zone/category, which are too
+     * broad to safely match against already-closed complaints), and only
+     * within a short recency window, so an unrelated old resolved complaint
+     * that merely shares a category can never get wrongly reopened.
+     */
+    Optional<Complaint> resolveRecentlyResolvedByEquipment(WhatsAppGroup group, String equipmentReference, OffsetDateTime referenceTime);
 }
