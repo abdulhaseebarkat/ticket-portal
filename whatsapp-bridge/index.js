@@ -16,6 +16,19 @@
  * dedicated number's WhatsApp app (Settings -> Linked Devices -> Link a
  * Device). The session is then persisted under AUTH_DIR so it survives
  * restarts without re-scanning.
+ *
+ * History backfill: WhatsApp only hands a linked device its chat history
+ * once, right when that device is first linked (scanning a fresh QR code) -
+ * it's not something that can be requested later for an already-linked
+ * session. So right after a fresh link, this bridge also processes that
+ * one-time history sync, but only messages from the last
+ * WHATSAPP_HISTORY_BACKFILL_HOURS hours (default 48) - recent enough to be
+ * genuinely useful context, not so old that half of it is already resolved
+ * in person and would just misrepresent today's dashboard as still-open
+ * issues. The backend independently de-duplicates by WhatsApp's own stable
+ * message id, so re-linking (or Baileys re-emitting overlapping history
+ * batches, which it sometimes does) can never create a duplicate message or
+ * complaint for something already captured.
  */
 
 const path = require('path');
@@ -34,6 +47,7 @@ const FormData = require('form-data');
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
 const BRIDGE_SECRET = process.env.BRIDGE_SHARED_SECRET || '';
 const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, 'auth');
+const HISTORY_BACKFILL_HOURS = Number(process.env.WHATSAPP_HISTORY_BACKFILL_HOURS || 48);
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 
@@ -74,6 +88,9 @@ async function start() {
         auth: state,
         logger: pino({ level: 'silent' }),
         printQRInTerminal: false,
+        // Needed so a fresh link actually receives a history sync payload to
+        // backfill from - without this WhatsApp sends little to nothing.
+        syncFullHistory: true,
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -112,18 +129,79 @@ async function start() {
     setInterval(() => syncGroups(sock).catch((err) => logger.error({ err: err.message }, 'Periodic group sync failed')), 30 * 60 * 1000);
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        // 'notify' = live messages. Ignore history-sync replays on reconnect.
+        // 'notify' = live messages. Historical replays come through the
+        // separate 'messaging-history.set' event handled below instead.
         if (type !== 'notify') {
             return;
         }
         for (const message of messages) {
             try {
-                await handleMessage(message);
+                await forwardMessage(message, { isHistorical: false });
             } catch (err) {
                 logger.error({ err }, 'Failed to handle an incoming message');
             }
         }
     });
+
+    sock.ev.on('messaging-history.set', async ({ messages }) => {
+        if (!messages || messages.length === 0) {
+            return;
+        }
+        await backfillHistory(messages);
+    });
+}
+
+/**
+ * Processes one batch of historical messages from WhatsApp's one-time
+ * post-link history sync: keeps only recent, real group messages, replays
+ * them oldest-first (so reply-threading and status correlation on the
+ * backend sees them in the order they actually happened), and forwards each
+ * one through the exact same path a live message takes.
+ */
+async function backfillHistory(messages) {
+    const cutoff = Date.now() - HISTORY_BACKFILL_HOURS * 60 * 60 * 1000;
+
+    const candidates = messages
+        .filter((message) => (message.key.remoteJid || '').endsWith('@g.us'))
+        .filter((message) => !message.key.fromMe)
+        .filter((message) => Boolean(message.message))
+        .map((message) => ({ message, timestampMs: toEpochMillis(message.messageTimestamp) }))
+        .filter(({ timestampMs }) => timestampMs !== null && timestampMs >= cutoff)
+        .sort((a, b) => a.timestampMs - b.timestampMs);
+
+    if (candidates.length === 0) {
+        return;
+    }
+
+    logger.info(`History backfill: found ${candidates.length} group message(s) from the last ${HISTORY_BACKFILL_HOURS}h to replay.`);
+
+    let forwarded = 0;
+    for (const { message, timestampMs } of candidates) {
+        try {
+            const wasForwarded = await forwardMessage(message, { isHistorical: true, timestampMs });
+            if (wasForwarded) {
+                forwarded += 1;
+            }
+        } catch (err) {
+            logger.error({ err: err.message }, 'Failed to forward a historical message - skipping it');
+        }
+    }
+    logger.info(`History backfill: forwarded ${forwarded} of ${candidates.length} message(s) to the backend.`);
+}
+
+/** Baileys' protobuf "Long" timestamps arrive as a number, a numeric string, or a Long-like {low,high} object depending on version. */
+function toEpochMillis(messageTimestamp) {
+    if (messageTimestamp === null || messageTimestamp === undefined) {
+        return null;
+    }
+    if (typeof messageTimestamp === 'number') {
+        return messageTimestamp * 1000;
+    }
+    if (typeof messageTimestamp.toNumber === 'function') {
+        return messageTimestamp.toNumber() * 1000;
+    }
+    const parsed = Number(messageTimestamp);
+    return Number.isFinite(parsed) ? parsed * 1000 : null;
 }
 
 async function syncGroups(sock) {
@@ -147,26 +225,35 @@ async function syncGroups(sock) {
     }
 }
 
-async function handleMessage(message) {
+/**
+ * Builds and forwards one WhatsApp message to the backend, whether it came
+ * in live or from the history backfill. Returns true if it was actually
+ * sent (false for messages filtered out - reactions, stickers, etc.).
+ */
+async function forwardMessage(message, { isHistorical, timestampMs } = {}) {
     const remoteJid = message.key.remoteJid || '';
     if (!remoteJid.endsWith('@g.us')) {
-        return; // Only interested in group chats.
+        return false; // Only interested in group chats.
     }
     if (message.key.fromMe) {
-        return; // This bridge never sends messages, so it should never see its own.
+        return false; // This bridge never sends messages, so it should never see its own.
     }
     if (!message.message) {
-        return; // Deleted/edited/protocol messages with no content.
+        return false; // Deleted/edited/protocol messages with no content.
     }
 
     const senderJid = message.key.participant || remoteJid;
     const senderWhatsapp = normalizeJid(senderJid);
     const senderName = message.pushName || null;
     const text = extractText(message.message);
-    const isImage = Boolean(message.message.imageMessage);
+    // History-synced media isn't guaranteed to still be downloadable (WhatsApp
+    // expires the decryption keys), so backfill forwards text only rather
+    // than risk a broken/partial image on an old message. Live messages are
+    // unaffected and still forward images as always.
+    const isImage = !isHistorical && Boolean(message.message.imageMessage);
 
     if (!text && !isImage) {
-        return; // Reactions, stickers, etc. - nothing a complaint can be made of.
+        return false; // Reactions, stickers, image-only history entries, etc.
     }
 
     const form = new FormData();
@@ -182,6 +269,9 @@ async function handleMessage(message) {
     }
     form.append('messageText', text || '');
     form.append('messageType', isImage ? 'image' : 'text');
+    if (isHistorical && timestampMs) {
+        form.append('messageTimestamp', new Date(timestampMs).toISOString());
+    }
 
     if (isImage) {
         try {
@@ -196,8 +286,10 @@ async function handleMessage(message) {
         await axios.post(`${BACKEND_URL}/api/whatsapp/bridge/messages`, form, {
             headers: { ...form.getHeaders(), 'X-Bridge-Secret': BRIDGE_SECRET },
         });
+        return true;
     } catch (err) {
         logger.error({ err: err.message }, 'Failed to forward message to the backend');
+        return false;
     }
 }
 

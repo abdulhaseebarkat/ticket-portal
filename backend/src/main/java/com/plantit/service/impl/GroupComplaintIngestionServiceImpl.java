@@ -99,6 +99,15 @@ public class GroupComplaintIngestionServiceImpl implements GroupComplaintIngesti
     @Override
     @Transactional
     public void ingestMessage(GroupMessagePayload payload, MultipartFile image) {
+        // WhatsApp message IDs are stable and unique regardless of whether a
+        // message arrives live or through the history backfill - this is
+        // what keeps backfilling a group's recent history from ever creating
+        // a duplicate message/complaint for something already captured.
+        if (messageRepository.findByExternalMessageId(payload.getExternalMessageId()).isPresent()) {
+            log.debug("Skipping message {} - already ingested", payload.getExternalMessageId());
+            return;
+        }
+
         Optional<WhatsAppGroup> groupOpt = groupRepository.findByExternalGroupId(payload.getExternalGroupId());
         if (groupOpt.isEmpty()) {
             log.warn("Received a message for an unknown WhatsApp group {} - was it synced yet?", payload.getExternalGroupId());
@@ -107,7 +116,10 @@ public class GroupComplaintIngestionServiceImpl implements GroupComplaintIngesti
         WhatsAppGroup group = groupOpt.get();
 
         Optional<Employee> employee = employeeLookupService.findByPhoneNumber(payload.getSenderWhatsapp());
-        OffsetDateTime now = OffsetDateTime.now();
+        // A backfilled historical message carries its own real send time so
+        // the dashboard timeline stays accurate; a live message has none and
+        // simply uses "now", as it always has.
+        OffsetDateTime now = payload.getMessageTimestamp() != null ? payload.getMessageTimestamp() : OffsetDateTime.now();
         String mediaUrl = (image != null && !image.isEmpty()) ? mediaStorageService.store(image) : null;
 
         // Every message from a known group is stored for audit/review, even

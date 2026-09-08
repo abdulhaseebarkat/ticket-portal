@@ -42,6 +42,7 @@ services:
     environment:
       BACKEND_URL: http://backend:8080
       BRIDGE_SHARED_SECRET: ${WHATSAPP_BRIDGE_SECRET:-demo-bridge-secret}
+      WHATSAPP_HISTORY_BACKFILL_HOURS: ${WHATSAPP_HISTORY_BACKFILL_HOURS:-48}
     volumes:
       - whatsapp-bridge-auth:/app/auth
     depends_on:

@@ -70,7 +70,8 @@ public class WhatsAppBridgeController {
                                                @RequestParam(required = false) String senderName,
                                                @RequestParam(required = false) String messageText,
                                                @RequestParam(required = false) String messageType,
-                                               @RequestParam(required = false) MultipartFile image) {
+                                               @RequestParam(required = false) MultipartFile image,
+                                               @RequestParam(required = false) String messageTimestamp) {
         if (!isAuthorized(secret)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -83,6 +84,9 @@ public class WhatsAppBridgeController {
                 .senderName(senderName)
                 .messageText(messageText)
                 .messageType(messageType)
+                .messageTimestamp(messageTimestamp != null && !messageTimestamp.isBlank()
+                        ? java.time.OffsetDateTime.parse(messageTimestamp)
+                        : null)
                 .build();
 
         ingestionService.ingestMessage(payload, image);

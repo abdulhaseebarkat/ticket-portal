@@ -24,4 +24,10 @@ public class GroupMessagePayload {
     private String senderName;
     private String messageText;
     private String messageType;
+    /**
+     * The message's real original send time (ISO-8601), set only when the
+     * bridge is forwarding a historical message (see the history backfill
+     * feature). Null for live messages, which use "now" as they always have.
+     */
+    private java.time.OffsetDateTime messageTimestamp;
 }

@@ -63,7 +63,13 @@ public class ComplaintPipeline {
             return Optional.of(complaint);
         }
 
-        if (classification.isComplaint()) {
+        // A "still broken"/"abhi bhi" reopen signal that isn't a reply and
+        // doesn't match any currently-open complaint (e.g. the original was
+        // already resolved, or falls outside a bounded history backfill
+        // window) is still a real, actionable report - it shouldn't vanish
+        // silently just because there's nothing left open to attach it to.
+        // Treat it the same as a fresh complaint rather than dropping it.
+        if (classification.isComplaint() || "REOPENED".equals(classification.getIntent())) {
             Complaint complaint = complaintRepository.save(complaintFactory.createComplaint(
                     classification, ctx.getMessageText(), ctx.getSender(), ctx.getGroup(), ctx.getNow(), ctx.getComplaintNumberPrefix()));
             linkMessage(complaint, ctx);
