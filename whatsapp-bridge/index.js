@@ -257,8 +257,15 @@ async function forwardMessage(message, { isHistorical, timestampMs } = {}) {
         return false; // Deleted/edited/protocol messages with no content.
     }
 
-    const senderJid = message.key.participant || remoteJid;
-    const senderWhatsapp = normalizeJid(senderJid);
+    // For a group message, the sender is whoever's in `key.participant` (or,
+    // for some history-sync message shapes, the top-level `participant`
+    // field instead). That's occasionally missing on history-synced
+    // messages - falling back to `remoteJid` here would be wrong, since for
+    // a group chat that's the *group's own* id, not a person, and would
+    // misattribute the message to the group itself rather than leaving the
+    // sender honestly unknown.
+    const senderJid = message.key.participant || message.participant || null;
+    const senderWhatsapp = senderJid ? normalizeJid(senderJid) : null;
     const senderName = message.pushName || null;
     const text = extractText(message.message);
     // History-synced media isn't guaranteed to still be downloadable (WhatsApp
