@@ -25,6 +25,13 @@ services:
       # own with, e.g., PowerShell:
       #   $b=New-Object byte[] 48; (New-Object Security.Cryptography.RNGCryptoServiceProvider).GetBytes($b); [Convert]::ToBase64String($b)
       APP_AUTH_TOKEN_SECRET: ${APP_AUTH_TOKEN_SECRET:-Lgq2H9uKMg/cjQaHgYvyVUMQaxDYmUhGubAuiwvkumQxa5am/0vwgpmKYI8c/3mG}
+      # Whatever origin(s) the browser actually loads the frontend from,
+      # beyond localhost:5173 (always allowed already) - e.g.
+      # http://172.17.6.114:5173 while testing on a LAN server, or
+      # https://itportal.yourcompany.com once there's a real domain.
+      # Comma-separated for more than one. Required or every login (and
+      # every other API call) 403s - see CorsConfig.java.
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-}
       APP_AUTH_SEED_EMAIL: ${APP_AUTH_SEED_EMAIL:-it.support@slmtires.com}
       APP_AUTH_SEED_PASSWORD: ${APP_AUTH_SEED_PASSWORD:-slmtires@123}
       WHATSAPP_BRIDGE_SECRET: ${WHATSAPP_BRIDGE_SECRET:-demo-bridge-secret}
