@@ -3,28 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchAllComplaints } from '../lib/api';
 import { relativeTime } from '../lib/time';
 import { ComplaintDetailModal } from '../components/ComplaintDetailModal';
+import { ComplaintBadge, priorityStyles, statusStyles } from '../components/ComplaintBadge';
 import type { ComplaintSummary } from '../types/complaint';
-
-const priorityStyles: Record<string, string> = {
-  CRITICAL: 'bg-rose-500/15 text-rose-300',
-  HIGH: 'bg-amber-500/15 text-amber-300',
-  MEDIUM: 'bg-sky-500/15 text-sky-300',
-  LOW: 'bg-slate-500/15 text-slate-300',
-};
-
-const statusStyles: Record<string, string> = {
-  OPEN: 'bg-orange-500/15 text-orange-300',
-  IN_PROGRESS: 'bg-sky-500/15 text-sky-300',
-  WAITING: 'bg-amber-500/15 text-amber-300',
-  RESOLVED: 'bg-emerald-500/15 text-emerald-300',
-  REOPENED: 'bg-rose-500/15 text-rose-300',
-  CLOSED: 'bg-slate-600/15 text-slate-300',
-};
-
-function Badge({ label, styles }: { label: string; styles: Record<string, string> }) {
-  const style = styles[label] || 'bg-slate-700/40 text-slate-300';
-  return <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-wide ${style}`}>{label.replace('_', ' ')}</span>;
-}
 
 // Statuses appear in this order when present, rather than alphabetically -
 // it roughly follows a complaint's real lifecycle.
@@ -170,8 +150,8 @@ export default function ComplaintsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs uppercase tracking-[0.2em] text-slate-500">{item.complaintNumber}</span>
-                        <Badge label={item.priority} styles={priorityStyles} />
-                        <Badge label={item.status} styles={statusStyles} />
+                        <ComplaintBadge label={item.priority} styles={priorityStyles} />
+                        <ComplaintBadge label={item.status} styles={statusStyles} />
                         <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">{item.category || 'Other'}</span>
                       </div>
                       <h3 className="mt-3 text-lg font-semibold text-white">{item.title}</h3>
