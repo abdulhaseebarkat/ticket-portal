@@ -4,6 +4,7 @@ import { fetchAllComplaints } from '../lib/api';
 import { relativeTime } from '../lib/time';
 import { ComplaintDetailModal } from '../components/ComplaintDetailModal';
 import { ComplaintBadge, priorityStyles, statusStyles } from '../components/ComplaintBadge';
+import { descriptionRemainder } from '../lib/complaintText';
 import type { ComplaintSummary } from '../types/complaint';
 
 // Statuses appear in this order when present, rather than alphabetically -
@@ -155,7 +156,10 @@ export default function ComplaintsPage() {
                         <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">{item.category || 'Other'}</span>
                       </div>
                       <h3 className="mt-3 text-lg font-semibold text-white">{item.title}</h3>
-                      <p className="mt-2 break-words text-sm text-slate-400">{item.description}</p>
+                      {(() => {
+                        const remainder = descriptionRemainder(item.title, item.description);
+                        return remainder ? <p className="mt-2 break-words text-sm text-slate-400">{remainder}</p> : null;
+                      })()}
                       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
                         <span>Equipment: {item.equipment || item.equipmentReference || 'Unassigned'}</span>
                         <span>Location: {item.location || 'Unassigned'}</span>

@@ -5,6 +5,7 @@ import { fetchDashboardSummary } from '../lib/api';
 import { relativeTime } from '../lib/time';
 import { ComplaintDetailModal } from '../components/ComplaintDetailModal';
 import { ComplaintBadge, priorityAccent, priorityStyles, statusStyles } from '../components/ComplaintBadge';
+import { descriptionRemainder } from '../lib/complaintText';
 import type { ComplaintSummary } from '../types/complaint';
 import { Activity, CheckCircle2, ChevronRight, Clock3, MapPin, MessageCircle, RefreshCw, ShieldAlert, TrendingUp, User } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
@@ -129,7 +130,10 @@ export function LiveDashboardPage() {
                           <ComplaintBadge label={item.status} styles={statusStyles} />
                         </div>
                         <h3 className="mt-2 truncate text-base font-semibold text-white sm:text-lg">{item.title}</h3>
-                        <p className="mt-1 line-clamp-2 text-sm text-slate-400">{item.description}</p>
+                        {(() => {
+                          const remainder = descriptionRemainder(item.title, item.description);
+                          return remainder ? <p className="mt-1 line-clamp-2 text-sm text-slate-400">{remainder}</p> : null;
+                        })()}
                       </div>
                       <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-slate-400" />
                     </div>
