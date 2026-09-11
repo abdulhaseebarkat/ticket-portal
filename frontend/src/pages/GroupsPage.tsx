@@ -24,8 +24,27 @@ export default function GroupsPage() {
   const [replayingId, setReplayingId] = useState<number | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [view, setView] = useState<View>('monitored');
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isBulkArchiving, setIsBulkArchiving] = useState(false);
 
   const groups = data ?? [];
+
+  const changeView = (next: View) => {
+    setView(next);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelected = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   // active = not archived. A group discovered by the bridge starts active
   // but unmonitored; archiving (active=false) is a separate, permanent
@@ -86,6 +105,44 @@ export default function GroupsPage() {
     persist(group, { active: false, monitoringEnabled: false }, `Archived "${group.name}".`, `Failed to archive "${group.name}". Please try again.`);
   };
 
+  const handleBulkArchive = async () => {
+    const targets = visibleGroups.filter((g) => selectedIds.has(g.id));
+    if (targets.length === 0) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `Archive ${targets.length} group(s)? They'll disappear from every view here except "Archived" - you can restore any of them later if needed.`
+      )
+    ) {
+      return;
+    }
+    setIsBulkArchiving(true);
+    try {
+      const results = await Promise.allSettled(
+        targets.map((group) =>
+          updateGroup(group.id, {
+            name: group.name,
+            area: group.area,
+            active: false,
+            monitoringEnabled: false,
+            defaultCategory: group.defaultCategory,
+          })
+        )
+      );
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      setStatusMessage(
+        failed === 0
+          ? `Archived ${targets.length} group(s).`
+          : `Archived ${targets.length - failed} of ${targets.length} group(s) - ${failed} failed, try again for those.`
+      );
+      await queryClient.invalidateQueries({ queryKey: ['whatsappGroups'] });
+      setSelectedIds(new Set());
+    } finally {
+      setIsBulkArchiving(false);
+    }
+  };
+
   const handleRestore = (group: Group) => {
     persist(group, { active: true }, `Restored "${group.name}".`, `Failed to restore "${group.name}". Please try again.`);
   };
@@ -136,7 +193,7 @@ export default function GroupsPage() {
           {tabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setView(tab.key)}
+              onClick={() => changeView(tab.key)}
               className={`rounded-2xl px-4 py-2 text-sm font-medium transition ${
                 view === tab.key ? 'bg-sky-500 text-slate-950' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
               }`}
@@ -185,11 +242,36 @@ export default function GroupsPage() {
           </div>
         ) : (
           <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-3">
+              <label className="flex items-center gap-2 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={visibleGroups.length > 0 && selectedIds.size === visibleGroups.length}
+                  onChange={(e) => setSelectedIds(e.target.checked ? new Set(visibleGroups.map((g) => g.id)) : new Set())}
+                  className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-sky-500"
+                />
+                Select all ({visibleGroups.length})
+              </label>
+              <span className="text-sm text-slate-500">{selectedIds.size} selected</span>
+              <button
+                onClick={handleBulkArchive}
+                disabled={selectedIds.size === 0 || isBulkArchiving}
+                className="ml-auto rounded-2xl border border-slate-700 px-4 py-2 text-sm text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isBulkArchiving ? 'Archiving...' : `Archive selected (${selectedIds.size})`}
+              </button>
+            </div>
             {visibleGroups.map((group) => {
               const draft = getDraft(group);
               return (
-                <div key={group.id} className="rounded-[24px] border border-slate-800 bg-slate-900/95 p-5">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div key={group.id} className="flex items-stretch gap-4 rounded-[24px] border border-slate-800 bg-slate-900/95 p-5">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(group.id)}
+                    onChange={() => toggleSelected(group.id)}
+                    className="mt-1 h-4 w-4 shrink-0 self-start rounded border-slate-700 bg-slate-900 text-sky-500"
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0 lg:w-56 lg:shrink-0">
                       <div className="text-lg font-semibold text-white">{group.name}</div>
                       <div className="mt-1 truncate text-xs uppercase tracking-[0.2em] text-slate-500" title={group.externalGroupId}>
