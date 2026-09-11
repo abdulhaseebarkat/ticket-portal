@@ -76,6 +76,17 @@ public class ComplaintFactory {
         int newlineIndex = message.indexOf('\n');
         if (newlineIndex > 0 && newlineIndex < endIndex) {
             endIndex = newlineIndex;
+        } else if (endIndex < message.length()) {
+            // Actually truncating at the 80-char limit (not stopped by an
+            // earlier newline) - back up to the last word boundary so the
+            // title never ends mid-word (e.g. "...not working pl" cutting
+            // "please" in half) - both as a heading on its own, and because
+            // the frontend derives "what's left to show" by matching this
+            // exact prefix against the full message.
+            int lastSpace = message.lastIndexOf(' ', endIndex);
+            if (lastSpace > 0) {
+                endIndex = lastSpace;
+            }
         }
         return message.substring(0, endIndex).trim();
     }
