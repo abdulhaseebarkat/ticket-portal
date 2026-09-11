@@ -181,7 +181,7 @@ public class ComplaintServiceImpl implements ComplaintService {
                 .location(complaint.getLocation() == null ? null : complaint.getLocation().getName())
                 .locationId(complaint.getLocation() == null ? null : complaint.getLocation().getId())
                 .department(complaint.getLocation() == null ? null : complaint.getLocation().getDepartment())
-                .reporter(complaint.getReporter() == null ? null : complaint.getReporter().getName())
+                .reporter(complaint.getReporter() != null ? complaint.getReporter().getName() : complaint.getReporterName())
                 .resolvedBy(complaint.getResolvedBy())
                 .group(complaint.getWhatsappGroup() == null ? null : complaint.getWhatsappGroup().getName())
                 .confidence(complaint.getAiConfidence())

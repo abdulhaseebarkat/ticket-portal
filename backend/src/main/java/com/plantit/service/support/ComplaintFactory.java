@@ -42,6 +42,7 @@ public class ComplaintFactory {
     public Complaint createComplaint(ClassificationResult classification,
                                       String messageText,
                                       Employee reporter,
+                                      String reporterLabel,
                                       WhatsAppGroup group,
                                       OffsetDateTime now,
                                       String complaintNumberPrefix) {
@@ -57,6 +58,7 @@ public class ComplaintFactory {
                 .location(location)
                 .equipmentReference(classification.getEquipmentReference())
                 .reporter(reporter)
+                .reporterName(reporterLabel)
                 .source("WhatsApp")
                 .whatsappGroup(group)
                 .priority(classification.getPriority())

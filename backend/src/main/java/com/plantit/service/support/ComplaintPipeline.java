@@ -91,7 +91,7 @@ public class ComplaintPipeline {
         // Treat it the same as a fresh complaint rather than dropping it.
         if (classification.isComplaint() || "REOPENED".equals(classification.getIntent())) {
             Complaint complaint = complaintRepository.save(complaintFactory.createComplaint(
-                    classification, ctx.getMessageText(), ctx.getSender(), ctx.getGroup(), ctx.getNow(), ctx.getComplaintNumberPrefix()));
+                    classification, ctx.getMessageText(), ctx.getSender(), ctx.getSenderLabel(), ctx.getGroup(), ctx.getNow(), ctx.getComplaintNumberPrefix()));
             linkMessage(complaint, ctx);
             recordEvent(complaint, "CREATED", null, "OPEN", ctx);
             return Optional.of(complaint);

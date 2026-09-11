@@ -41,6 +41,10 @@ public class Complaint {
     @JoinColumn(name = "reporter_id")
     private Employee reporter;
 
+    /** The WhatsApp sender's display name, captured regardless of whether they match a known Employee - reporter above requires a phone-number match, this doesn't. */
+    @Column(name = "reporter_name")
+    private String reporterName;
+
     @Column(nullable = false)
     private String source;
 
