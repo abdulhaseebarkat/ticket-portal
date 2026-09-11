@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchGroups, updateGroup, replayGroupMessages } from '../lib/api';
 
@@ -12,6 +12,8 @@ interface Group {
   defaultCategory: string | null;
 }
 
+type View = 'monitored' | 'all' | 'archived';
+
 const categoryOptions = ['Scanner', 'HMI', 'Zebra Printer', 'Network', 'Computer', 'Software', 'Internet', 'Other'];
 
 export default function GroupsPage() {
@@ -21,8 +23,19 @@ export default function GroupsPage() {
   const [savingId, setSavingId] = useState<number | null>(null);
   const [replayingId, setReplayingId] = useState<number | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
+  const [view, setView] = useState<View>('monitored');
 
   const groups = data ?? [];
+
+  // active = not archived. A group discovered by the bridge starts active
+  // but unmonitored; archiving (active=false) is a separate, permanent
+  // "this isn't a real plant group" decision - the periodic bridge sync
+  // never resets it, so archiving something sticks even across reconnects.
+  const monitoredGroups = useMemo(() => groups.filter((g) => g.active && g.monitoringEnabled), [groups]);
+  const allActiveGroups = useMemo(() => groups.filter((g) => g.active), [groups]);
+  const archivedGroups = useMemo(() => groups.filter((g) => !g.active), [groups]);
+
+  const visibleGroups = view === 'monitored' ? monitoredGroups : view === 'all' ? allActiveGroups : archivedGroups;
 
   const getDraft = (group: Group): Group => ({ ...group, ...drafts[group.id] });
 
@@ -30,29 +43,51 @@ export default function GroupsPage() {
     setDrafts((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
   };
 
-  const handleSave = async (group: Group) => {
-    const draft = getDraft(group);
+  const clearDraft = (id: number) => {
+    setDrafts((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const persist = async (group: Group, patch: Partial<Group>, successMessage: string, failureMessage: string) => {
+    const next = { ...getDraft(group), ...patch };
     setSavingId(group.id);
     try {
       await updateGroup(group.id, {
-        name: draft.name,
-        area: draft.area,
-        active: draft.active,
-        monitoringEnabled: draft.monitoringEnabled,
-        defaultCategory: draft.defaultCategory,
+        name: next.name,
+        area: next.area,
+        active: next.active,
+        monitoringEnabled: next.monitoringEnabled,
+        defaultCategory: next.defaultCategory,
       });
-      setStatusMessage(`Saved "${draft.name}".`);
+      setStatusMessage(successMessage);
       await queryClient.invalidateQueries({ queryKey: ['whatsappGroups'] });
-      setDrafts((prev) => {
-        const next = { ...prev };
-        delete next[group.id];
-        return next;
-      });
+      clearDraft(group.id);
     } catch (error) {
-      setStatusMessage(`Failed to save "${draft.name}". Please try again.`);
+      setStatusMessage(failureMessage);
     } finally {
       setSavingId(null);
     }
+  };
+
+  const handleSave = (group: Group) => {
+    const draft = getDraft(group);
+    persist(group, {}, `Saved "${draft.name}".`, `Failed to save "${draft.name}". Please try again.`);
+  };
+
+  // Archiving also turns monitoring off - an archived-but-still-monitored
+  // group would be a confusing, contradictory state to leave behind.
+  const handleArchive = (group: Group) => {
+    if (!window.confirm(`Archive "${group.name}"? It'll disappear from every view here except "Archived" - you can restore it later if needed.`)) {
+      return;
+    }
+    persist(group, { active: false, monitoringEnabled: false }, `Archived "${group.name}".`, `Failed to archive "${group.name}". Please try again.`);
+  };
+
+  const handleRestore = (group: Group) => {
+    persist(group, { active: true }, `Restored "${group.name}".`, `Failed to restore "${group.name}". Please try again.`);
   };
 
   const handleReplay = async (group: Group) => {
@@ -76,6 +111,12 @@ export default function GroupsPage() {
     }
   };
 
+  const tabs: { key: View; label: string; count: number }[] = [
+    { key: 'monitored', label: 'Monitored', count: monitoredGroups.length },
+    { key: 'all', label: 'All active', count: allActiveGroups.length },
+    { key: 'archived', label: 'Archived', count: archivedGroups.length },
+  ];
+
   return (
     <div className="space-y-8">
       <section className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-7 shadow-card">
@@ -84,11 +125,25 @@ export default function GroupsPage() {
             <div className="text-sm uppercase tracking-[0.28em] text-slate-500">WhatsApp Groups</div>
             <h1 className="mt-3 text-3xl font-semibold text-white">Department group monitoring</h1>
             <p className="mt-2 max-w-2xl text-slate-400">
-              Groups discovered by the WhatsApp bridge appear below automatically, with monitoring off. Turn
-              monitoring on and set an area to start turning that group&apos;s messages into complaints.
+              Groups discovered by the WhatsApp bridge appear under &quot;All active&quot; automatically, with monitoring
+              off. Turn monitoring on and set an area to start turning that group&apos;s messages into complaints - or
+              archive anything that isn&apos;t a real plant group so it stops cluttering this list.
             </p>
           </div>
           {statusMessage && <div className="rounded-3xl bg-slate-900 px-4 py-3 text-sm text-slate-200">{statusMessage}</div>}
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setView(tab.key)}
+              className={`rounded-2xl px-4 py-2 text-sm font-medium transition ${
+                view === tab.key ? 'bg-sky-500 text-slate-950' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              {tab.label} <span className="ml-1 opacity-70">({tab.count})</span>
+            </button>
+          ))}
         </div>
       </section>
 
@@ -100,9 +155,37 @@ export default function GroupsPage() {
             No WhatsApp groups discovered yet. Link the bridge to a WhatsApp number that&apos;s a member of your
             department groups - they&apos;ll appear here automatically once it connects.
           </p>
+        ) : visibleGroups.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-700 p-6 text-center text-slate-400">
+            {view === 'monitored'
+              ? "No groups are being monitored yet - switch to \"All active\" to turn one on."
+              : view === 'archived'
+                ? 'Nothing archived.'
+                : 'No active groups.'}
+          </p>
+        ) : view === 'archived' ? (
+          <div className="space-y-3">
+            {archivedGroups.map((group) => (
+              <div key={group.id} className="flex items-center justify-between gap-4 rounded-[24px] border border-slate-800 bg-slate-900/95 p-5">
+                <div className="min-w-0">
+                  <div className="text-base font-medium text-slate-300">{group.name}</div>
+                  <div className="mt-1 truncate text-xs uppercase tracking-[0.2em] text-slate-500" title={group.externalGroupId}>
+                    {group.externalGroupId}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleRestore(group)}
+                  disabled={savingId === group.id}
+                  className="shrink-0 rounded-2xl bg-slate-800 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
+                >
+                  {savingId === group.id ? 'Restoring...' : 'Restore'}
+                </button>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="space-y-4">
-            {groups.map((group) => {
+            {visibleGroups.map((group) => {
               const draft = getDraft(group);
               return (
                 <div key={group.id} className="rounded-[24px] border border-slate-800 bg-slate-900/95 p-5">
@@ -157,7 +240,15 @@ export default function GroupsPage() {
                         Monitoring enabled
                       </label>
                     </div>
-                    <div className="flex shrink-0 gap-2">
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <button
+                        onClick={() => handleArchive(group)}
+                        disabled={savingId === group.id}
+                        title="Not a real plant group - hide it from this list permanently"
+                        className="rounded-2xl border border-slate-700 px-4 py-2 text-sm text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        Archive
+                      </button>
                       <button
                         onClick={() => handleReplay(group)}
                         disabled={replayingId === group.id}
