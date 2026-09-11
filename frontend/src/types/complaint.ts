@@ -10,7 +10,9 @@ export interface ComplaintSummary {
   equipment?: string;
   equipmentReference?: string;
   location?: string;
+  department?: string;
   reporter?: string;
+  resolvedBy?: string;
   group?: string;
   confidence?: number;
   createdAt: string;

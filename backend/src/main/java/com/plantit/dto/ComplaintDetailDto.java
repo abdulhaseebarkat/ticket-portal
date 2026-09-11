@@ -23,7 +23,9 @@ public class ComplaintDetailDto {
     private String equipmentReference;
     private String location;
     private Long locationId;
+    private String department;
     private String reporter;
+    private String resolvedBy;
     private String group;
     private Double confidence;
     private OffsetDateTime createdAt;

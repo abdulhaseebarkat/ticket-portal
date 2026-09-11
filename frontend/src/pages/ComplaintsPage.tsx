@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAllComplaints } from '../lib/api';
-import { relativeTime } from '../lib/time';
+import { formatDuration, relativeTime } from '../lib/time';
 import { ComplaintDetailModal } from '../components/ComplaintDetailModal';
-import { ComplaintBadge, priorityStyles, statusStyles } from '../components/ComplaintBadge';
-import { descriptionRemainder } from '../lib/complaintText';
+import { ComplaintBadge, priorityAccent, priorityStyles, statusStyles } from '../components/ComplaintBadge';
 import type { ComplaintSummary } from '../types/complaint';
+import { Building2, CheckCircle2, Clock3, User, Wrench } from 'lucide-react';
+
+const RESOLVED_STATUSES = new Set(['RESOLVED', 'CLOSED']);
 
 // Statuses appear in this order when present, rather than alphabetically -
 // it roughly follows a complaint's real lifecycle.
@@ -144,39 +146,61 @@ export default function ComplaintsPage() {
               No complaints match this filter yet.
             </p>
           ) : (
-            <div className="space-y-4">
-              {filteredComplaints.map((item) => (
-                <div key={item.id} className="rounded-[24px] border border-slate-800 bg-slate-900/95 p-5">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs uppercase tracking-[0.2em] text-slate-500">{item.complaintNumber}</span>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredComplaints.map((item) => {
+                const isResolved = RESOLVED_STATUSES.has(item.status);
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setSelectedComplaint(item)}
+                    className="flex items-stretch gap-0 overflow-hidden rounded-[20px] border border-slate-800 bg-slate-900/95 text-left transition hover:border-slate-700 hover:bg-slate-900"
+                  >
+                    <span className={`w-1 shrink-0 ${priorityAccent[item.priority] || 'bg-slate-600'}`} aria-hidden="true" />
+                    <div className="flex min-w-0 flex-1 flex-col p-5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{item.complaintNumber}</span>
+                        <span className="shrink-0 text-xs text-slate-600">{relativeTime(item.createdAt)}</span>
+                      </div>
+                      <h3 className="mt-2 line-clamp-2 text-base font-semibold text-white">{item.title}</h3>
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
                         <ComplaintBadge label={item.priority} styles={priorityStyles} />
                         <ComplaintBadge label={item.status} styles={statusStyles} />
-                        <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">{item.category || 'Other'}</span>
+                        <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300">{item.category || 'Other'}</span>
                       </div>
-                      <h3 className="mt-3 text-lg font-semibold text-white">{item.title}</h3>
-                      {(() => {
-                        const remainder = descriptionRemainder(item.title, item.description);
-                        return remainder ? <p className="mt-2 break-words text-sm text-slate-400">{remainder}</p> : null;
-                      })()}
-                      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
-                        <span>Equipment: {item.equipment || item.equipmentReference || 'Unassigned'}</span>
-                        <span>Location: {item.location || 'Unassigned'}</span>
-                        <span>Reporter: {item.reporter || 'Unknown'}</span>
-                        <span>Group: {item.group || 'Unknown'}</span>
-                        <span>{relativeTime(item.createdAt)}</span>
+
+                      <div className="mt-4 space-y-2 border-t border-slate-800 pt-4 text-sm text-slate-400">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                          <span className="truncate">{item.department || 'Unassigned department'}</span>
+                          <span className="text-slate-700">·</span>
+                          <span className="truncate">{item.location || 'Unassigned location'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Wrench className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                          <span className="truncate">{item.equipment || item.equipmentReference || 'No equipment identified'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <User className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                          <span className="truncate">Raised by {item.reporter || 'unknown sender'}</span>
+                        </div>
+                        {isResolved && (
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                            <span className="truncate text-slate-300">Solved by {item.resolvedBy || 'unknown'}</span>
+                          </div>
+                        )}
                       </div>
+
+                      {isResolved && item.resolvedAt && (
+                        <div className="mt-4 flex items-center gap-2 self-start rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
+                          <Clock3 className="h-3.5 w-3.5" />
+                          Resolved in {formatDuration(item.createdAt, item.resolvedAt)}
+                        </div>
+                      )}
                     </div>
-                    <button
-                      onClick={() => setSelectedComplaint(item)}
-                      className="shrink-0 rounded-2xl bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-                    >
-                      View details
-                    </button>
-                  </div>
-                </div>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

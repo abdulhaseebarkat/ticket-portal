@@ -116,8 +116,10 @@ public class ComplaintServiceImpl implements ComplaintService {
         complaint.setStatus(request.getStatus());
         if ("RESOLVED".equalsIgnoreCase(request.getStatus()) && !"RESOLVED".equalsIgnoreCase(oldStatus)) {
             complaint.setResolvedAt(OffsetDateTime.now());
+            complaint.setResolvedBy(performedBy);
         } else if (!"RESOLVED".equalsIgnoreCase(request.getStatus())) {
             complaint.setResolvedAt(null);
+            complaint.setResolvedBy(null);
         }
 
         complaint.setUpdatedAt(OffsetDateTime.now());
@@ -178,7 +180,9 @@ public class ComplaintServiceImpl implements ComplaintService {
                 .equipmentReference(complaint.getEquipmentReference())
                 .location(complaint.getLocation() == null ? null : complaint.getLocation().getName())
                 .locationId(complaint.getLocation() == null ? null : complaint.getLocation().getId())
+                .department(complaint.getLocation() == null ? null : complaint.getLocation().getDepartment())
                 .reporter(complaint.getReporter() == null ? null : complaint.getReporter().getName())
+                .resolvedBy(complaint.getResolvedBy())
                 .group(complaint.getWhatsappGroup() == null ? null : complaint.getWhatsappGroup().getName())
                 .confidence(complaint.getAiConfidence())
                 .createdAt(complaint.getCreatedAt())

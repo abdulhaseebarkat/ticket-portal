@@ -224,7 +224,9 @@ export function ComplaintDetailModal({ complaint, onClose }: ComplaintDetailModa
             <span>Category: {complaint.category || 'Other'}</span>
             <span>Equipment: {complaint.equipment || detail?.equipmentReference || complaint.equipmentReference || 'Unassigned'}</span>
             <span>Location: {complaint.location || 'Unassigned'}</span>
+            <span>Department: {detail?.department || complaint.department || 'Unassigned'}</span>
             <span>Reporter: {complaint.reporter || 'Unknown'}</span>
+            {(detail?.resolvedBy || complaint.resolvedBy) && <span>Solved by: {detail?.resolvedBy || complaint.resolvedBy}</span>}
             <span>Group: {complaint.group || 'Unknown'}</span>
           </div>
         )}

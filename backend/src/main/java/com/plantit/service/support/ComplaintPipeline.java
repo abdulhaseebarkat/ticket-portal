@@ -124,10 +124,12 @@ public class ComplaintPipeline {
         } else if ("RESOLUTION_DETECTED".equals(intent)) {
             complaint.setStatus("RESOLVED");
             complaint.setResolvedAt(ctx.getNow());
+            complaint.setResolvedBy(ctx.getSenderLabel());
             newStatus = "RESOLVED";
         } else if ("REOPENED".equals(intent)) {
             complaint.setStatus("REOPENED");
             complaint.setResolvedAt(null);
+            complaint.setResolvedBy(null);
             newStatus = "REOPENED";
         }
 

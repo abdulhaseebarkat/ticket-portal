@@ -72,6 +72,10 @@ public class Complaint {
     @Column(name = "resolved_at")
     private OffsetDateTime resolvedAt;
 
+    /** Who actually marked it resolved - the WhatsApp reply's sender, or the admin who corrected the status manually. Cleared alongside resolvedAt on a reopen. */
+    @Column(name = "resolved_by")
+    private String resolvedBy;
+
     @Column(name = "closed_at")
     private OffsetDateTime closedAt;
 }

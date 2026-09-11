@@ -19,7 +19,9 @@ public class ComplaintSummaryDto {
     private String equipment;
     private String equipmentReference;
     private String location;
+    private String department;
     private String reporter;
+    private String resolvedBy;
     private String group;
     private Double confidence;
     private OffsetDateTime createdAt;
