@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LogOut, MessageCircle, Home, Users, ListChecks, BarChart3, KeyRound, Tags } from 'lucide-react';
+import { LogOut, Home, Users, ListChecks, BarChart3, KeyRound, Tags } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { ChangePasswordModal } from '../ChangePasswordModal';
 
@@ -9,8 +9,7 @@ const navItems = [
   { label: 'Analytics', to: '/analytics', icon: BarChart3 },
   { label: 'Complaints', to: '/complaints', icon: ListChecks },
   { label: 'WhatsApp Groups', to: '/groups', icon: Users },
-  { label: 'Categories & Equipment', to: '/reference-data', icon: Tags },
-  { label: 'WhatsApp Simulator', to: '/simulator', icon: MessageCircle }
+  { label: 'Categories & Equipment', to: '/reference-data', icon: Tags }
 ];
 
 export function Sidebar() {

@@ -1,7 +1,6 @@
 import { Outlet, Route, Routes, Navigate } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 import { LiveDashboardPage } from '../../pages/LiveDashboardPage';
-import WhatsAppSimulatorPage from '../../pages/WhatsAppSimulatorPage';
 import GroupsPage from '../../pages/GroupsPage';
 import ComplaintsPage from '../../pages/ComplaintsPage';
 import AnalyticsPage from '../../pages/AnalyticsPage';
@@ -37,7 +36,6 @@ export function AppShell() {
               <Route path="/complaints" element={<ComplaintsPage />} />
               <Route path="/groups" element={<GroupsPage />} />
               <Route path="/reference-data" element={<ReferenceDataPage />} />
-              <Route path="/simulator" element={<WhatsAppSimulatorPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

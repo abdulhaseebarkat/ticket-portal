@@ -1,13 +1,10 @@
 package com.plantit.service.impl;
 
-import com.plantit.dto.WhatsAppSimulateRequest;
 import com.plantit.entity.Employee;
 import com.plantit.entity.WhatsAppGroup;
 import com.plantit.entity.WhatsAppMessage;
 import com.plantit.integration.ai.ComplaintClassificationProvider;
 import com.plantit.integration.ai.model.ClassificationResult;
-import com.plantit.integration.whatsapp.WhatsAppMessageProvider;
-import com.plantit.repository.EmployeeRepository;
 import com.plantit.repository.WhatsAppGroupRepository;
 import com.plantit.repository.WhatsAppMessageRepository;
 import com.plantit.service.WhatsAppService;
@@ -22,79 +19,28 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
+/** The Meta WhatsApp Business Cloud API webhook path (see WhatsAppWebhookController) - 1:1 messages only, not group chats (see whatsapp-bridge/ for the group-reading path that's actually used). */
 @Service
 public class WhatsAppServiceImpl implements WhatsAppService {
     private static final Logger log = LoggerFactory.getLogger(WhatsAppServiceImpl.class);
 
-    private final EmployeeRepository employeeRepository;
     private final WhatsAppGroupRepository groupRepository;
     private final WhatsAppMessageRepository messageRepository;
     private final ComplaintClassificationProvider classificationProvider;
-    private final WhatsAppMessageProvider whatsappProvider;
     private final EmployeeLookupService employeeLookupService;
     private final ComplaintPipeline complaintPipeline;
 
     public WhatsAppServiceImpl(
-            EmployeeRepository employeeRepository,
             WhatsAppGroupRepository groupRepository,
             WhatsAppMessageRepository messageRepository,
             ComplaintClassificationProvider classificationProvider,
-            WhatsAppMessageProvider whatsappProvider,
             EmployeeLookupService employeeLookupService,
             ComplaintPipeline complaintPipeline) {
-        this.employeeRepository = employeeRepository;
         this.groupRepository = groupRepository;
         this.messageRepository = messageRepository;
         this.classificationProvider = classificationProvider;
-        this.whatsappProvider = whatsappProvider;
         this.employeeLookupService = employeeLookupService;
         this.complaintPipeline = complaintPipeline;
-    }
-
-    @Override
-    @Transactional
-    public void simulateIncomingMessage(WhatsAppSimulateRequest request) {
-        Optional<WhatsAppGroup> group = groupRepository.findAll().stream()
-                .filter(it -> it.getName().equalsIgnoreCase(request.getGroupName()))
-                .findFirst();
-        if (group.isEmpty()) {
-            return;
-        }
-
-        Optional<Employee> employee = employeeRepository.findAll().stream()
-                .filter(it -> it.getName().equalsIgnoreCase(request.getEmployeeName()))
-                .findFirst();
-
-        ClassificationResult classification = classificationProvider.classifyMessage(request.getMessage());
-        OffsetDateTime now = OffsetDateTime.now();
-
-        WhatsAppMessage message = messageRepository.save(WhatsAppMessage.builder()
-                .externalMessageId("mock-" + System.currentTimeMillis())
-                .group(group.get())
-                .senderEmployee(employee.orElse(null))
-                .senderName(request.getEmployeeName())
-                .senderWhatsapp(employee.map(Employee::getWhatsappNumber).orElse("unknown"))
-                .messageText(request.getMessage())
-                .messageType("text")
-                .timestamp(now)
-                .processed(false)
-                .processingStatus(classification.isComplaint() ? "Classified" : "Unprocessed")
-                .createdAt(now)
-                .build());
-
-        complaintPipeline.apply(IngestionContext.builder()
-                .classification(classification)
-                .messageText(request.getMessage())
-                .sender(employee.orElse(null))
-                .senderLabel(employee.map(Employee::getName).orElse(request.getEmployeeName()))
-                .supportStaff(employee.map(employeeLookupService::isSupportStaff).orElse(false))
-                .group(group.get())
-                .whatsAppMessage(message)
-                .now(now)
-                .complaintNumberPrefix("IT-")
-                .build());
-
-        whatsappProvider.sendMessage(request.getEmployeeName(), request.getMessage());
     }
 
     @Override

@@ -79,10 +79,6 @@ export const fetchDashboardSummary = async () => {
   return response.data;
 };
 
-export const simulateWhatsApp = async (payload: { groupName: string; employeeName: string; message: string }) => {
-  await api.post('/whatsapp/simulate', payload);
-};
-
 export const fetchComplaintDetail = async (id: number) => {
   const response = await api.get(`/complaints/${id}`);
   return response.data;
