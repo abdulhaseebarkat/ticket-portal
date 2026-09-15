@@ -256,8 +256,11 @@ export function StatusBreakdownModal({
                             <MessageCircle className="h-3.5 w-3.5" /> {item.group || 'WhatsApp'}
                           </span>
                           {item.resolvedAt ? (
-                            <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-emerald-300">
-                              <CheckCircle2 className="h-3.5 w-3.5" /> {item.resolvedBy || 'Unknown'} · {formatDuration(item.createdAt, item.resolvedAt)}
+                            <span
+                              className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-emerald-300"
+                              title={new Date(item.resolvedAt).toLocaleString()}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" /> {item.resolvedBy || 'Unknown'} · took {formatDuration(item.createdAt, item.resolvedAt)} · {relativeTime(item.resolvedAt)}
                             </span>
                           ) : (
                             <span className="ml-auto inline-flex items-center gap-1.5 text-slate-600">
