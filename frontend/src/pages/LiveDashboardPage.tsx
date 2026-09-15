@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { fetchDashboardSummary } from '../lib/api';
 import { relativeTime } from '../lib/time';
 import { ComplaintDetailModal } from '../components/ComplaintDetailModal';
+import { StatusBreakdownModal } from '../components/StatusBreakdownModal';
 import { ComplaintBadge, priorityAccent, priorityStyles, statusStyles } from '../components/ComplaintBadge';
 import { descriptionRemainder } from '../lib/complaintText';
 import type { ComplaintSummary } from '../types/complaint';
@@ -21,6 +22,7 @@ export function LiveDashboardPage() {
   const navigate = useNavigate();
   const [period, setPeriod] = useState('This Month');
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const { data, isLoading, isFetching, refetch } = useQuery<DashboardSummary>({
     queryKey: ['dashboardSummary'], queryFn: fetchDashboardSummary, refetchInterval: 5000, refetchOnWindowFocus: true,
   });
@@ -161,7 +163,7 @@ export function LiveDashboardPage() {
         <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
           <div className="mb-4">
             <h2 className="text-xl font-semibold text-white">Status breakdown</h2>
-            <p className="text-sm text-slate-400">Every complaint on record, at a glance</p>
+            <p className="text-sm text-slate-400">Every complaint on record, at a glance - click a status for details</p>
           </div>
           {statusCounts.length === 0 ? (
             <p className="text-slate-400">No status data yet.</p>
@@ -173,16 +175,28 @@ export function LiveDashboardPage() {
                   <YAxis type="category" dataKey={() => 'status'} hide />
                   <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: 'rgba(148, 163, 184, 0.08)' }} />
                   {statusCounts.map(({ status }) => (
-                    <Bar key={status} dataKey={status} stackId="a" fill={statusColors[status] || '#64748b'} barSize={28} />
+                    <Bar
+                      key={status}
+                      dataKey={status}
+                      stackId="a"
+                      fill={statusColors[status] || '#64748b'}
+                      barSize={28}
+                      onClick={() => setStatusFilter(status)}
+                      cursor="pointer"
+                    />
                   ))}
                 </BarChart>
               </ResponsiveContainer>
-              <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-300">
+              <div className="mt-5 flex flex-wrap gap-x-2 gap-y-2 text-sm text-slate-300">
                 {statusCounts.map(({ status, count }) => (
-                  <span key={status} className="inline-flex items-center gap-2">
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    className="inline-flex items-center gap-2 rounded-full px-2.5 py-1 transition hover:bg-slate-800"
+                  >
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: statusColors[status] || '#64748b' }} />
                     {status.replace('_', ' ')} · {count}
-                  </span>
+                  </button>
                 ))}
               </div>
             </>
@@ -221,6 +235,17 @@ export function LiveDashboardPage() {
         </div>
       </section>
 
+      {statusFilter && (
+        <StatusBreakdownModal
+          status={statusFilter}
+          complaints={complaints.filter((item) => item.status === statusFilter)}
+          onClose={() => setStatusFilter(null)}
+          onSelectComplaint={(item) => {
+            setStatusFilter(null);
+            setSelectedComplaint(item);
+          }}
+        />
+      )}
       {selectedComplaint && <ComplaintDetailModal complaint={selectedComplaint} onClose={() => setSelectedComplaint(null)} />}
     </div>
   );
