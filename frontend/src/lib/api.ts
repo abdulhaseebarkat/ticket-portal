@@ -7,6 +7,7 @@ import type {
   CategoryRequest,
   EquipmentRecord,
   EquipmentRequest,
+  LocationRecord,
 } from '../types/complaint';
 
 const TOKEN_KEY = 'plantit-token';
@@ -101,7 +102,7 @@ export const fetchCategories = async () => {
 
 export const fetchLocations = async () => {
   const response = await api.get('/locations');
-  return response.data as ReferenceOption[];
+  return response.data as LocationRecord[];
 };
 
 export const fetchEquipmentOptions = async () => {

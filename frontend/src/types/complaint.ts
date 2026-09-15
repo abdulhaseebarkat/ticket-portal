@@ -61,6 +61,11 @@ export interface EquipmentRecord extends ReferenceOption {
   type?: string | null;
 }
 
+export interface LocationRecord extends ReferenceOption {
+  plantArea?: string | null;
+  department?: string | null;
+}
+
 export interface EquipmentRequest {
   equipmentCode: string;
   name: string;
