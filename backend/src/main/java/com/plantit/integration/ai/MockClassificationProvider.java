@@ -107,12 +107,25 @@ public class MockClassificationProvider implements ComplaintClassificationProvid
             boolean hasProblemLanguage = PROBLEM_LANGUAGE_PATTERN.matcher(message).find();
             if (!hasCategorySignal && !hasEquipmentSignal && !hasProblemLanguage) {
                 intent = "IRRELEVANT";
+            } else if (hasCategorySignal && !hasEquipmentSignal && !hasProblemLanguage) {
+                // Only a bare category word (e.g. "scanner") with nothing else
+                // backing it up - too weak to assume this is reporting a brand
+                // new problem on its own (e.g. "Please bring scanner to IT
+                // office" mentions "scanner" but isn't a complaint at all; it's
+                // a follow-up on one already open). Give correlation a chance
+                // to attach it to an already-open complaint in the same
+                // category/group first - see ComplaintPipeline, which only
+                // creates a new complaint from this if nothing open matches.
+                intent = "POSSIBLE_COMPLAINT";
             }
         }
 
         // Only create new complaints for actual complaints, not status updates
         // (or irrelevant chatter, which never becomes a complaint at all).
-        boolean isComplaintMessage = intent.equals("NEW_COMPLAINT");
+        // POSSIBLE_COMPLAINT still counts - it just gets one extra chance at
+        // correlation first (see ComplaintPipeline) before falling back to
+        // creating a new complaint like NEW_COMPLAINT always does.
+        boolean isComplaintMessage = intent.equals("NEW_COMPLAINT") || intent.equals("POSSIBLE_COMPLAINT");
 
         return ClassificationResult.builder()
                 .isComplaint(isComplaintMessage)

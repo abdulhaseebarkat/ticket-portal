@@ -60,7 +60,13 @@ public class ComplaintPipeline {
             return Optional.empty();
         }
 
-        if (target.isEmpty() && !classification.isComplaint()) {
+        // POSSIBLE_COMPLAINT (a bare category word like "scanner" with no
+        // equipment code and no actual problem language - see
+        // MockClassificationProvider) is too weak to assume it's reporting a
+        // new problem outright; give it the same shot at correlating to an
+        // already-open complaint that a status update gets, before falling
+        // back to creating a new complaint further down.
+        if (target.isEmpty() && (!classification.isComplaint() || "POSSIBLE_COMPLAINT".equals(classification.getIntent()))) {
             target = correlationService.resolveByContext(
                     ctx.getGroup(), classification.getEquipmentReference(), classification.getLocationHint(), classification.getCategory());
         }
