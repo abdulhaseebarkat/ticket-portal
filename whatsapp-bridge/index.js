@@ -229,6 +229,7 @@ async function syncGroups(sock) {
         if (payload.length === 0) {
             return;
         }
+        logger.info({ groups: payload.map((g) => g.name) }, `Currently participating in ${payload.length} group(s).`);
         await axios.post(
             `${BACKEND_URL}/api/whatsapp/bridge/groups/sync`,
             { groups: payload },
