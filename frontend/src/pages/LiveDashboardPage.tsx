@@ -9,7 +9,7 @@ import { ComplaintBadge, priorityAccent, priorityStyles, statusStyles } from '..
 import { descriptionRemainder } from '../lib/complaintText';
 import type { ComplaintSummary } from '../types/complaint';
 import { Activity, CheckCircle2, ChevronRight, Clock3, MapPin, MessageCircle, RefreshCw, ShieldAlert, TrendingUp, User } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { statusColors, STATUS_ORDER, trendNew, trendResolved, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
 
 type Complaint = ComplaintSummary;
@@ -226,14 +226,14 @@ export function LiveDashboardPage() {
             <h2 className="text-xl font-semibold text-white">New vs Resolved</h2>
             <p className="mb-4 text-sm text-slate-400">Daily activity, last seven days</p>
             <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={trendData}>
+              <BarChart data={trendData} barGap={4} barCategoryGap="24%">
                 <CartesianGrid stroke={gridColor} strokeDasharray="4 4" />
                 <XAxis dataKey="date" stroke={axisColor} />
                 <YAxis stroke={axisColor} allowDecimals={false} />
-                <Tooltip contentStyle={chartTooltipStyle} />
-                <Area type="monotone" dataKey="new" name="New" stroke={trendNew} fill={`${trendNew}25`} strokeWidth={2} />
-                <Area type="monotone" dataKey="resolved" name="Resolved" stroke={trendResolved} fill={`${trendResolved}25`} strokeWidth={2} />
-              </AreaChart>
+                <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: 'rgba(148, 163, 184, 0.08)' }} />
+                <Bar dataKey="new" name="New" fill={trendNew} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="resolved" name="Resolved" fill={trendResolved} radius={[4, 4, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
             <div className="mt-3 flex gap-5 text-sm text-slate-300">
               <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: trendNew }} /> New</span>

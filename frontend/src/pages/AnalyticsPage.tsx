@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchAllComplaints } from '../lib/api';
+import { fetchAllComplaints, fetchLocations } from '../lib/api';
 import { RankedBarChart } from '../components/charts/RankedBarChart';
 import { Heatmap } from '../components/charts/Heatmap';
 import type { ComplaintSummary } from '../types/complaint';
 import { Activity, CheckCircle2, Clock3, ShieldAlert } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { sequentialPrimary, sequentialSecondary, priorityColors, PRIORITY_ORDER, trendNew, trendResolved, trendBacklog, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
+import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { categorical, sequentialPrimary, sequentialSecondary, priorityColors, PRIORITY_ORDER, trendNew, trendResolved, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
 
 const RANGE_PRESETS = ['Today', 'Last 7 Days', 'Last 30 Days', 'All Time', 'Custom'] as const;
 type RangePreset = (typeof RANGE_PRESETS)[number];
@@ -50,6 +50,7 @@ function rangeBounds(preset: RangePreset, customStart: string, customEnd: string
 export default function AnalyticsPage() {
   const { data, isLoading } = useQuery<ComplaintSummary[]>({ queryKey: ['allComplaints'], queryFn: fetchAllComplaints });
   const complaints = data ?? [];
+  const { data: locations } = useQuery({ queryKey: ['locations'], queryFn: fetchLocations });
 
   const [department, setDepartment] = useState('All Departments');
   const [rangePreset, setRangePreset] = useState<RangePreset>('Last 30 Days');
@@ -137,42 +138,72 @@ export default function AnalyticsPage() {
     return days;
   }, [filteredComplaints, bounds]);
 
-  // The real open-ticket backlog as of each day on the trend above - a
-  // running total (created so far minus resolved so far), scoped to the
-  // department filter but deliberately NOT limited to complaints created
-  // within the date range, so the line starts at the backlog that actually
-  // existed on day one rather than a misleading 0. Its own chart, never
-  // combined onto the New/Resolved axis above - a running total and a daily
-  // count are different measures and don't belong on one y-axis.
-  const departmentComplaints = useMemo(
-    () => complaints.filter((item) => department === 'All Departments' || (item.location || 'Unassigned') === department),
-    [complaints, department]
-  );
-  const backlogData = useMemo(() => {
+  // The real unresolved backlog as of each day on the trend above, broken
+  // out per location - a running total (created so far minus resolved so
+  // far) per location, deliberately NOT limited to complaints created
+  // within the date range, so each line starts at the backlog that
+  // actually existed on day one rather than a misleading 0. Its own
+  // chart, never combined onto the New/Resolved axis above - a running
+  // total and a daily count are different measures and don't belong on
+  // one y-axis.
+
+  // Stable color per location, assigned from the FULL known-location list
+  // (not whichever subset happens to be charted right now) - so a line's
+  // color never shifts just because the department filter narrows what's
+  // visible. "Unassigned" always takes the next slot after every real
+  // location, for the same reason.
+  const locationColorMap = useMemo(() => {
+    const names = (locations ?? []).filter((location) => location.active).map((location) => location.name).sort((a, b) => a.localeCompare(b));
+    const map: Record<string, string> = {};
+    names.forEach((name, index) => {
+      map[name] = categorical[index % categorical.length];
+    });
+    map.Unassigned = categorical[names.length % categorical.length];
+    return map;
+  }, [locations]);
+
+  // Only chart locations that actually have at least one complaint on
+  // record (all-time, regardless of the date range) - a location with
+  // zero complaints ever contributes a flat line at 0 forever, which is
+  // just clutter, not information. Respects the department filter: pick
+  // one location there and this naturally narrows to just that line.
+  const backlogLocations = useMemo(() => {
+    if (department !== 'All Departments') return [department];
+    return Array.from(new Set(complaints.map((item) => item.location || 'Unassigned'))).sort((a, b) => a.localeCompare(b));
+  }, [department, complaints]);
+
+  const backlogByLocationData = useMemo(() => {
     return trendData.map((day) => {
       const dayEnd = new Date(day.key);
       dayEnd.setHours(23, 59, 59, 999);
-      const createdSoFar = departmentComplaints.filter((item) => new Date(item.createdAt) <= dayEnd).length;
-      const resolvedSoFar = departmentComplaints.filter((item) => item.resolvedAt && new Date(item.resolvedAt) <= dayEnd).length;
-      return { label: day.label, backlog: createdSoFar - resolvedSoFar };
+      const row: Record<string, number | string> = { label: day.label };
+      backlogLocations.forEach((location) => {
+        const atLocation = complaints.filter((item) => (item.location || 'Unassigned') === location);
+        const createdSoFar = atLocation.filter((item) => new Date(item.createdAt) <= dayEnd).length;
+        const resolvedSoFar = atLocation.filter((item) => item.resolvedAt && new Date(item.resolvedAt) <= dayEnd).length;
+        row[location] = createdSoFar - resolvedSoFar;
+      });
+      return row;
     });
-  }, [trendData, departmentComplaints]);
+  }, [trendData, backlogLocations, complaints]);
 
-  // A plain start-vs-end comparison misses a range that spiked and came
-  // back down (e.g. a busy week fully cleared by today) - call out the
-  // peak whenever it's above both endpoints instead of calling that "steady".
+  // One-line overall takeaway (summed across every charted location) below
+  // the per-location detail - a plain start-vs-end comparison misses a
+  // range that spiked and came back down, so call out the peak whenever
+  // it's above both endpoints instead of calling that "steady".
   const backlogSummary = useMemo(() => {
-    if (backlogData.length === 0) return 'No data yet.';
-    const start = backlogData[0].backlog;
-    const end = backlogData[backlogData.length - 1].backlog;
-    const peak = Math.max(...backlogData.map((day) => day.backlog));
+    if (backlogByLocationData.length === 0) return 'No data yet.';
+    const totals = backlogByLocationData.map((day) => backlogLocations.reduce((sum, location) => sum + (Number(day[location]) || 0), 0));
+    const start = totals[0];
+    const end = totals[totals.length - 1];
+    const peak = Math.max(...totals);
     if (peak > Math.max(start, end)) {
-      return `Peaked at ${peak} unresolved during this range, back to ${end} now.`;
+      return `Peaked at ${peak} unresolved total during this range, back to ${end} now.`;
     }
     if (end > start) return 'Unresolved backlog is growing over this range.';
     if (end < start) return 'Unresolved backlog is shrinking over this range.';
     return 'Unresolved backlog is holding steady over this range.';
-  }, [backlogData]);
+  }, [backlogByLocationData, backlogLocations]);
 
   const categoryData = useMemo(() => {
     const counts = filteredComplaints.reduce<Record<string, number>>((result, item) => {
@@ -313,21 +344,21 @@ export default function AnalyticsPage() {
             ))}
           </section>
 
-          <section className="grid gap-5 xl:grid-cols-[1.3fr_1fr]">
+          <section className="grid gap-5 xl:grid-cols-2">
             <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
               <div className="mb-4">
                 <h2 className="text-xl font-semibold text-white">New vs Resolved</h2>
                 <p className="text-sm text-slate-400">Daily activity across the selected range</p>
               </div>
               <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={trendData}>
+                <BarChart data={trendData} barGap={4} barCategoryGap="24%">
                   <CartesianGrid stroke={gridColor} strokeDasharray="4 4" />
                   <XAxis dataKey="label" stroke={axisColor} tick={{ fontSize: 12 }} />
                   <YAxis stroke={axisColor} allowDecimals={false} />
-                  <Tooltip contentStyle={chartTooltipStyle} />
-                  <Area type="monotone" dataKey="new" name="New" stroke={trendNew} fill={`${trendNew}25`} strokeWidth={2} />
-                  <Area type="monotone" dataKey="resolved" name="Resolved" stroke={trendResolved} fill={`${trendResolved}25`} strokeWidth={2} />
-                </AreaChart>
+                  <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: 'rgba(148, 163, 184, 0.08)' }} />
+                  <Bar dataKey="new" name="New" fill={trendNew} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="resolved" name="Resolved" fill={trendResolved} radius={[4, 4, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
               <div className="mt-3 flex gap-5 text-sm text-slate-300">
                 <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: trendNew }} /> New</span>
@@ -337,18 +368,42 @@ export default function AnalyticsPage() {
 
             <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
               <div className="mb-4">
-                <h2 className="text-xl font-semibold text-white">Unresolved backlog</h2>
-                <p className="text-sm text-slate-400">Total not-yet-done tickets (open, in progress, or waiting), day by day</p>
+                <h2 className="text-xl font-semibold text-white">Unresolved backlog by location</h2>
+                <p className="text-sm text-slate-400">Not-yet-done tickets (open, in progress, or waiting), per location</p>
               </div>
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={backlogData}>
-                  <CartesianGrid stroke={gridColor} strokeDasharray="4 4" />
-                  <XAxis dataKey="label" stroke={axisColor} tick={{ fontSize: 12 }} />
-                  <YAxis stroke={axisColor} allowDecimals={false} />
-                  <Tooltip contentStyle={chartTooltipStyle} />
-                  <Line type="monotone" dataKey="backlog" name="Unresolved backlog" stroke={trendBacklog} strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              {backlogLocations.length === 0 ? (
+                <p className="pt-16 text-center text-slate-400">No data yet.</p>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={backlogByLocationData}>
+                      <CartesianGrid stroke={gridColor} strokeDasharray="4 4" />
+                      <XAxis dataKey="label" stroke={axisColor} tick={{ fontSize: 12 }} />
+                      <YAxis stroke={axisColor} allowDecimals={false} />
+                      <Tooltip contentStyle={chartTooltipStyle} />
+                      {backlogLocations.map((location) => (
+                        <Line
+                          key={location}
+                          type="monotone"
+                          dataKey={location}
+                          name={location}
+                          stroke={locationColorMap[location] || '#64748b'}
+                          strokeWidth={2}
+                          dot={false}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-slate-300">
+                    {backlogLocations.map((location) => (
+                      <span key={location} className="inline-flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: locationColorMap[location] || '#64748b' }} />
+                        {location}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
               <p className="mt-3 text-sm text-slate-400">{backlogSummary}</p>
             </div>
           </section>
