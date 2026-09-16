@@ -30,9 +30,13 @@ public class DashboardServiceImpl implements DashboardService {
             .filter(complaint -> complaint.getResolvedAt() != null)
             .filter(complaint -> complaint.getResolvedAt().toLocalDate().equals(LocalDate.now()))
             .count();
+        // CLOSED is just as done as RESOLVED - a closed critical complaint
+        // is no longer an "unresolved critical issue" either, even if it
+        // was closed directly without ever passing through RESOLVED.
         int critical = (int) complaints.stream()
             .filter(complaint -> "CRITICAL".equalsIgnoreCase(complaint.getPriority()))
             .filter(complaint -> !"RESOLVED".equalsIgnoreCase(complaint.getStatus()))
+            .filter(complaint -> !"CLOSED".equalsIgnoreCase(complaint.getStatus()))
             .count();
 
         return DashboardSummaryDto.builder()

@@ -78,7 +78,12 @@ export default function AnalyticsPage() {
   const recap = useMemo(() => {
     const total = filteredComplaints.length;
     const resolved = filteredComplaints.filter((item) => item.status === 'RESOLVED').length;
-    const open = total - resolved;
+    // "Open" means still needs attention - total minus both terminal
+    // states. CLOSED is just as done as RESOLVED, so it must be excluded
+    // here too, not just RESOLVED - otherwise a closed complaint keeps
+    // counting as open forever.
+    const closed = filteredComplaints.filter((item) => item.status === 'CLOSED').length;
+    const open = total - resolved - closed;
     const resolutionMinutes = filteredComplaints
       .filter((item) => item.resolvedAt)
       .map((item) => (new Date(item.resolvedAt as string).getTime() - new Date(item.createdAt).getTime()) / 60000)
@@ -152,6 +157,22 @@ export default function AnalyticsPage() {
       return { label: day.label, backlog: createdSoFar - resolvedSoFar };
     });
   }, [trendData, departmentComplaints]);
+
+  // A plain start-vs-end comparison misses a range that spiked and came
+  // back down (e.g. a busy week fully cleared by today) - call out the
+  // peak whenever it's above both endpoints instead of calling that "steady".
+  const backlogSummary = useMemo(() => {
+    if (backlogData.length === 0) return 'No data yet.';
+    const start = backlogData[0].backlog;
+    const end = backlogData[backlogData.length - 1].backlog;
+    const peak = Math.max(...backlogData.map((day) => day.backlog));
+    if (peak > Math.max(start, end)) {
+      return `Peaked at ${peak} open during this range, back to ${end} now.`;
+    }
+    if (end > start) return 'Backlog is growing over this range.';
+    if (end < start) return 'Backlog is shrinking over this range.';
+    return 'Backlog is holding steady over this range.';
+  }, [backlogData]);
 
   const categoryData = useMemo(() => {
     const counts = filteredComplaints.reduce<Record<string, number>>((result, item) => {
@@ -328,13 +349,7 @@ export default function AnalyticsPage() {
                   <Line type="monotone" dataKey="backlog" name="Open backlog" stroke={trendBacklog} strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
-              <p className="mt-3 text-sm text-slate-400">
-                {backlogData.length > 0 && backlogData[backlogData.length - 1].backlog > (backlogData[0]?.backlog ?? 0)
-                  ? 'Backlog is growing over this range.'
-                  : backlogData.length > 0 && backlogData[backlogData.length - 1].backlog < (backlogData[0]?.backlog ?? 0)
-                  ? 'Backlog is shrinking over this range.'
-                  : 'Backlog is holding steady over this range.'}
-              </p>
+              <p className="mt-3 text-sm text-slate-400">{backlogSummary}</p>
             </div>
           </section>
 

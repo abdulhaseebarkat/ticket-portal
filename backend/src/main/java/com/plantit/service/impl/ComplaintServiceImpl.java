@@ -112,15 +112,25 @@ public class ComplaintServiceImpl implements ComplaintService {
         complaint.setLocation(newLocation);
         complaint.setPriority(request.getPriority());
 
+        // RESOLVED and CLOSED are both "done" states - a complaint closed
+        // directly (skipping RESOLVED) is just as much off everyone's plate,
+        // so it needs the same resolved_at/resolved_by stamp, or every
+        // backlog/resolution-time view (and every "Solved by" display) reads
+        // it as still open forever, since those all key off resolved_at.
         String oldStatus = complaint.getStatus();
+        boolean wasTerminal = "RESOLVED".equalsIgnoreCase(oldStatus) || "CLOSED".equalsIgnoreCase(oldStatus);
+        boolean isTerminal = "RESOLVED".equalsIgnoreCase(request.getStatus()) || "CLOSED".equalsIgnoreCase(request.getStatus());
         complaint.setStatus(request.getStatus());
-        if ("RESOLVED".equalsIgnoreCase(request.getStatus()) && !"RESOLVED".equalsIgnoreCase(oldStatus)) {
+        if (isTerminal && !wasTerminal) {
             complaint.setResolvedAt(OffsetDateTime.now());
             complaint.setResolvedBy(performedBy);
-        } else if (!"RESOLVED".equalsIgnoreCase(request.getStatus())) {
+        } else if (!isTerminal) {
             complaint.setResolvedAt(null);
             complaint.setResolvedBy(null);
         }
+        // isTerminal && wasTerminal (e.g. RESOLVED -> CLOSED) intentionally
+        // leaves resolved_at/resolved_by untouched - preserves the original
+        // resolution time rather than overwriting it with the closure time.
 
         complaint.setUpdatedAt(OffsetDateTime.now());
         complaintRepository.save(complaint);
