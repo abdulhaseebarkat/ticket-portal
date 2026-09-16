@@ -79,12 +79,11 @@ export default function AnalyticsPage() {
   const recap = useMemo(() => {
     const total = filteredComplaints.length;
     const resolved = filteredComplaints.filter((item) => item.status === 'RESOLVED').length;
-    // "Open" means still needs attention - total minus both terminal
-    // states. CLOSED is just as done as RESOLVED, so it must be excluded
-    // here too, not just RESOLVED - otherwise a closed complaint keeps
-    // counting as open forever.
-    const closed = filteredComplaints.filter((item) => item.status === 'CLOSED').length;
-    const open = total - resolved - closed;
+    // Literal status === OPEN - matches the Dashboard's "Open Complaints"
+    // tile exactly, so the two pages never show two different numbers
+    // both labeled "Open" again. WAITING/IN_PROGRESS/REOPENED complaints
+    // are real too, just not counted under this specific label.
+    const open = filteredComplaints.filter((item) => item.status === 'OPEN').length;
     const resolutionMinutes = filteredComplaints
       .filter((item) => item.resolvedAt)
       .map((item) => (new Date(item.resolvedAt as string).getTime() - new Date(item.createdAt).getTime()) / 60000)
@@ -198,11 +197,11 @@ export default function AnalyticsPage() {
     const end = totals[totals.length - 1];
     const peak = Math.max(...totals);
     if (peak > Math.max(start, end)) {
-      return `Peaked at ${peak} unresolved total during this range, back to ${end} now.`;
+      return `Peaked at ${peak} open total during this range, back to ${end} now.`;
     }
-    if (end > start) return 'Unresolved backlog is growing over this range.';
-    if (end < start) return 'Unresolved backlog is shrinking over this range.';
-    return 'Unresolved backlog is holding steady over this range.';
+    if (end > start) return 'Open backlog is growing over this range.';
+    if (end < start) return 'Open backlog is shrinking over this range.';
+    return 'Open backlog is holding steady over this range.';
   }, [backlogByLocationData, backlogLocations]);
 
   const categoryData = useMemo(() => {
@@ -257,7 +256,7 @@ export default function AnalyticsPage() {
 
   const recapTiles = [
     { label: 'Total in range', value: recap.total, icon: ShieldAlert },
-    { label: 'Unresolved', value: recap.open, icon: Activity },
+    { label: 'Open', value: recap.open, icon: Activity },
     { label: 'Resolved', value: recap.resolved, icon: CheckCircle2 },
     { label: 'Avg. Resolution', value: recap.avgResolution, icon: Clock3 },
   ];
@@ -368,8 +367,8 @@ export default function AnalyticsPage() {
 
             <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
               <div className="mb-4">
-                <h2 className="text-xl font-semibold text-white">Unresolved backlog by location</h2>
-                <p className="text-sm text-slate-400">Not-yet-done tickets (open, in progress, or waiting), per location</p>
+                <h2 className="text-xl font-semibold text-white">Open backlog by location</h2>
+                <p className="text-sm text-slate-400">Open, in-progress, or waiting tickets, per location</p>
               </div>
               {backlogLocations.length === 0 ? (
                 <p className="pt-16 text-center text-slate-400">No data yet.</p>
