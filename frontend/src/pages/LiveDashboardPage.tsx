@@ -10,7 +10,7 @@ import { descriptionRemainder } from '../lib/complaintText';
 import type { ComplaintSummary } from '../types/complaint';
 import { Activity, CheckCircle2, ChevronRight, Clock3, MapPin, MessageCircle, RefreshCw, ShieldAlert, TrendingUp, User } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { statusColors, STATUS_ORDER, trendOpen, trendResolved, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
+import { statusColors, STATUS_ORDER, trendNew, trendResolved, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
 
 type Complaint = ComplaintSummary;
 interface DashboardSummary {
@@ -36,7 +36,27 @@ export function LiveDashboardPage() {
     { label: 'Avg. Resolution', value: data?.averageResolutionTime ?? '—', delta: 'Report to resolved, all-time', icon: Clock3 },
   ];
 
-  const trendData = useMemo(() => { const days = [...Array(7)].map((_, index) => { const date = new Date(); date.setDate(date.getDate() - (6 - index)); return { date, label: date.toLocaleDateString(undefined, { weekday: 'short' }), open: 0, resolved: 0 }; }); complaints.forEach(item => { const day = days.find(entry => entry.date.toDateString() === new Date(item.createdAt).toDateString()); if (day) item.status === 'RESOLVED' ? day.resolved++ : day.open++; }); return days.map(day => ({ date: day.label, open: day.open, resolved: day.resolved })); }, [complaints]);
+  // "New" buckets by the day a complaint was actually created; "Resolved"
+  // buckets by the day it was actually resolved (resolvedAt) - not by
+  // today's status, which would put a complaint's resolution on whatever
+  // day it happened to be *created* and keep silently rewriting old bars
+  // as old tickets eventually close.
+  const trendData = useMemo(() => {
+    const days = [...Array(7)].map((_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - index));
+      return { date, label: date.toLocaleDateString(undefined, { weekday: 'short' }), new: 0, resolved: 0 };
+    });
+    complaints.forEach((item) => {
+      const createdDay = days.find((entry) => entry.date.toDateString() === new Date(item.createdAt).toDateString());
+      if (createdDay) createdDay.new += 1;
+      if (item.resolvedAt) {
+        const resolvedDay = days.find((entry) => entry.date.toDateString() === new Date(item.resolvedAt as string).toDateString());
+        if (resolvedDay) resolvedDay.resolved += 1;
+      }
+    });
+    return days.map((day) => ({ date: day.label, new: day.new, resolved: day.resolved }));
+  }, [complaints]);
   const filteredComplaints = complaints.filter(item => period === 'This Month' || Date.now() - new Date(item.createdAt).getTime() <= (period === 'Today' ? 86400000 : 7 * 86400000));
 
   // Status breakdown as one horizontal stacked bar - a full picture in a single strip.
@@ -203,20 +223,20 @@ export function LiveDashboardPage() {
           )}
 
           <div className="mt-8 border-t border-slate-800 pt-6">
-            <h2 className="text-xl font-semibold text-white">Open vs Resolved</h2>
-            <p className="mb-4 text-sm text-slate-400">Last seven days from live records</p>
+            <h2 className="text-xl font-semibold text-white">New vs Resolved</h2>
+            <p className="mb-4 text-sm text-slate-400">Daily activity, last seven days</p>
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={trendData}>
                 <CartesianGrid stroke={gridColor} strokeDasharray="4 4" />
                 <XAxis dataKey="date" stroke={axisColor} />
                 <YAxis stroke={axisColor} allowDecimals={false} />
                 <Tooltip contentStyle={chartTooltipStyle} />
-                <Area type="monotone" dataKey="open" name="Open" stroke={trendOpen} fill={`${trendOpen}25`} strokeWidth={2} />
+                <Area type="monotone" dataKey="new" name="New" stroke={trendNew} fill={`${trendNew}25`} strokeWidth={2} />
                 <Area type="monotone" dataKey="resolved" name="Resolved" stroke={trendResolved} fill={`${trendResolved}25`} strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
             <div className="mt-3 flex gap-5 text-sm text-slate-300">
-              <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: trendOpen }} /> Open</span>
+              <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: trendNew }} /> New</span>
               <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: trendResolved }} /> Resolved</span>
             </div>
           </div>

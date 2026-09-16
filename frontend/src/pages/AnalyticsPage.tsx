@@ -5,8 +5,8 @@ import { RankedBarChart } from '../components/charts/RankedBarChart';
 import { Heatmap } from '../components/charts/Heatmap';
 import type { ComplaintSummary } from '../types/complaint';
 import { Activity, CheckCircle2, Clock3, ShieldAlert } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { sequentialPrimary, sequentialSecondary, priorityColors, PRIORITY_ORDER, trendOpen, trendResolved, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
+import { ResponsiveContainer, AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { sequentialPrimary, sequentialSecondary, priorityColors, PRIORITY_ORDER, trendNew, trendResolved, trendBacklog, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
 
 const RANGE_PRESETS = ['Today', 'Last 7 Days', 'Last 30 Days', 'All Time', 'Custom'] as const;
 type RangePreset = (typeof RANGE_PRESETS)[number];
@@ -89,6 +89,11 @@ export default function AnalyticsPage() {
     return { total, open, resolved, avgResolution };
   }, [filteredComplaints]);
 
+  // "New" buckets by the day a complaint was actually created; "Resolved"
+  // buckets by the day it was actually resolved (resolvedAt) - not by
+  // today's status, which would put a resolution on whatever day the
+  // complaint happened to be *created* and keep silently rewriting old
+  // bars as old tickets eventually close.
   const trendData = useMemo(() => {
     if (filteredComplaints.length === 0) return [];
     let start: Date;
@@ -97,7 +102,11 @@ export default function AnalyticsPage() {
       start = bounds.start;
       end = bounds.end;
     } else {
-      const timestamps = filteredComplaints.map((item) => new Date(item.createdAt).getTime());
+      // "All Time" has no fixed end - stretch it to cover the latest
+      // resolution too, not just the latest creation, so a complaint
+      // resolved after every other complaint's creation date still gets a
+      // bar to land on.
+      const timestamps = filteredComplaints.flatMap((item) => [new Date(item.createdAt).getTime(), ...(item.resolvedAt ? [new Date(item.resolvedAt).getTime()] : [])]);
       start = new Date(Math.min(...timestamps));
       end = new Date(Math.max(...timestamps));
     }
@@ -105,22 +114,44 @@ export default function AnalyticsPage() {
     cursor.setHours(0, 0, 0, 0);
     const endDay = new Date(end);
     endDay.setHours(0, 0, 0, 0);
-    const days: { key: string; label: string; open: number; resolved: number }[] = [];
+    const days: { key: string; label: string; new: number; resolved: number }[] = [];
     let safety = 0;
     while (cursor <= endDay && safety < 120) {
-      days.push({ key: cursor.toDateString(), label: cursor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), open: 0, resolved: 0 });
+      days.push({ key: cursor.toDateString(), label: cursor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), new: 0, resolved: 0 });
       cursor.setDate(cursor.getDate() + 1);
       safety += 1;
     }
     filteredComplaints.forEach((item) => {
-      const day = days.find((entry) => entry.key === new Date(item.createdAt).toDateString());
-      if (day) {
-        if (item.status === 'RESOLVED') day.resolved += 1;
-        else day.open += 1;
+      const createdDay = days.find((entry) => entry.key === new Date(item.createdAt).toDateString());
+      if (createdDay) createdDay.new += 1;
+      if (item.resolvedAt) {
+        const resolvedDay = days.find((entry) => entry.key === new Date(item.resolvedAt as string).toDateString());
+        if (resolvedDay) resolvedDay.resolved += 1;
       }
     });
     return days;
   }, [filteredComplaints, bounds]);
+
+  // The real open-ticket backlog as of each day on the trend above - a
+  // running total (created so far minus resolved so far), scoped to the
+  // department filter but deliberately NOT limited to complaints created
+  // within the date range, so the line starts at the backlog that actually
+  // existed on day one rather than a misleading 0. Its own chart, never
+  // combined onto the New/Resolved axis above - a running total and a daily
+  // count are different measures and don't belong on one y-axis.
+  const departmentComplaints = useMemo(
+    () => complaints.filter((item) => department === 'All Departments' || (item.location || 'Unassigned') === department),
+    [complaints, department]
+  );
+  const backlogData = useMemo(() => {
+    return trendData.map((day) => {
+      const dayEnd = new Date(day.key);
+      dayEnd.setHours(23, 59, 59, 999);
+      const createdSoFar = departmentComplaints.filter((item) => new Date(item.createdAt) <= dayEnd).length;
+      const resolvedSoFar = departmentComplaints.filter((item) => item.resolvedAt && new Date(item.resolvedAt) <= dayEnd).length;
+      return { label: day.label, backlog: createdSoFar - resolvedSoFar };
+    });
+  }, [trendData, departmentComplaints]);
 
   const categoryData = useMemo(() => {
     const counts = filteredComplaints.reduce<Record<string, number>>((result, item) => {
@@ -261,24 +292,49 @@ export default function AnalyticsPage() {
             ))}
           </section>
 
-          <section className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold text-white">Trend over time</h2>
-              <p className="text-sm text-slate-400">Open vs resolved across the selected range</p>
+          <section className="grid gap-5 xl:grid-cols-[1.3fr_1fr]">
+            <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
+              <div className="mb-4">
+                <h2 className="text-xl font-semibold text-white">New vs Resolved</h2>
+                <p className="text-sm text-slate-400">Daily activity across the selected range</p>
+              </div>
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={trendData}>
+                  <CartesianGrid stroke={gridColor} strokeDasharray="4 4" />
+                  <XAxis dataKey="label" stroke={axisColor} tick={{ fontSize: 12 }} />
+                  <YAxis stroke={axisColor} allowDecimals={false} />
+                  <Tooltip contentStyle={chartTooltipStyle} />
+                  <Area type="monotone" dataKey="new" name="New" stroke={trendNew} fill={`${trendNew}25`} strokeWidth={2} />
+                  <Area type="monotone" dataKey="resolved" name="Resolved" stroke={trendResolved} fill={`${trendResolved}25`} strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+              <div className="mt-3 flex gap-5 text-sm text-slate-300">
+                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: trendNew }} /> New</span>
+                <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: trendResolved }} /> Resolved</span>
+              </div>
             </div>
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={trendData}>
-                <CartesianGrid stroke={gridColor} strokeDasharray="4 4" />
-                <XAxis dataKey="label" stroke={axisColor} tick={{ fontSize: 12 }} />
-                <YAxis stroke={axisColor} allowDecimals={false} />
-                <Tooltip contentStyle={chartTooltipStyle} />
-                <Area type="monotone" dataKey="open" name="Open" stroke={trendOpen} fill={`${trendOpen}25`} strokeWidth={2} />
-                <Area type="monotone" dataKey="resolved" name="Resolved" stroke={trendResolved} fill={`${trendResolved}25`} strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-            <div className="mt-3 flex gap-5 text-sm text-slate-300">
-              <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: trendOpen }} /> Open</span>
-              <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: trendResolved }} /> Resolved</span>
+
+            <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
+              <div className="mb-4">
+                <h2 className="text-xl font-semibold text-white">Open backlog</h2>
+                <p className="text-sm text-slate-400">Total still-open tickets, day by day</p>
+              </div>
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={backlogData}>
+                  <CartesianGrid stroke={gridColor} strokeDasharray="4 4" />
+                  <XAxis dataKey="label" stroke={axisColor} tick={{ fontSize: 12 }} />
+                  <YAxis stroke={axisColor} allowDecimals={false} />
+                  <Tooltip contentStyle={chartTooltipStyle} />
+                  <Line type="monotone" dataKey="backlog" name="Open backlog" stroke={trendBacklog} strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+              <p className="mt-3 text-sm text-slate-400">
+                {backlogData.length > 0 && backlogData[backlogData.length - 1].backlog > (backlogData[0]?.backlog ?? 0)
+                  ? 'Backlog is growing over this range.'
+                  : backlogData.length > 0 && backlogData[backlogData.length - 1].backlog < (backlogData[0]?.backlog ?? 0)
+                  ? 'Backlog is shrinking over this range.'
+                  : 'Backlog is holding steady over this range.'}
+              </p>
             </div>
           </section>
 

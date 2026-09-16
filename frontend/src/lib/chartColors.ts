@@ -38,10 +38,14 @@ export const statusColors: Record<string, string> = {
   RESOLVED: categorical[5], // green
 };
 
-// Trend chart (open vs. resolved over time) - reuses the same blue/green
+// Trend chart (new vs. resolved over time) - reuses the same blue/green
 // roles as the status chart above for a consistent color language.
-export const trendOpen = categorical[0]; // blue
+export const trendNew = categorical[0]; // blue
 export const trendResolved = categorical[5]; // green
+// Open-backlog line - its own chart (never combined with the new/resolved
+// axis above - two measures of very different scale don't share an axis),
+// so it needs no legend, just a hue distinct from every status color.
+export const trendBacklog = categorical[6]; // violet
 
 // Reserved status/severity palette - never reused for generic series, kept
 // distinct from the categorical set by design. Priority is a severity axis
