@@ -167,11 +167,11 @@ export default function AnalyticsPage() {
     const end = backlogData[backlogData.length - 1].backlog;
     const peak = Math.max(...backlogData.map((day) => day.backlog));
     if (peak > Math.max(start, end)) {
-      return `Peaked at ${peak} open during this range, back to ${end} now.`;
+      return `Peaked at ${peak} unresolved during this range, back to ${end} now.`;
     }
-    if (end > start) return 'Backlog is growing over this range.';
-    if (end < start) return 'Backlog is shrinking over this range.';
-    return 'Backlog is holding steady over this range.';
+    if (end > start) return 'Unresolved backlog is growing over this range.';
+    if (end < start) return 'Unresolved backlog is shrinking over this range.';
+    return 'Unresolved backlog is holding steady over this range.';
   }, [backlogData]);
 
   const categoryData = useMemo(() => {
@@ -226,7 +226,7 @@ export default function AnalyticsPage() {
 
   const recapTiles = [
     { label: 'Total in range', value: recap.total, icon: ShieldAlert },
-    { label: 'Open', value: recap.open, icon: Activity },
+    { label: 'Unresolved', value: recap.open, icon: Activity },
     { label: 'Resolved', value: recap.resolved, icon: CheckCircle2 },
     { label: 'Avg. Resolution', value: recap.avgResolution, icon: Clock3 },
   ];
@@ -337,8 +337,8 @@ export default function AnalyticsPage() {
 
             <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
               <div className="mb-4">
-                <h2 className="text-xl font-semibold text-white">Open backlog</h2>
-                <p className="text-sm text-slate-400">Total still-open tickets, day by day</p>
+                <h2 className="text-xl font-semibold text-white">Unresolved backlog</h2>
+                <p className="text-sm text-slate-400">Total not-yet-done tickets (open, in progress, or waiting), day by day</p>
               </div>
               <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={backlogData}>
@@ -346,7 +346,7 @@ export default function AnalyticsPage() {
                   <XAxis dataKey="label" stroke={axisColor} tick={{ fontSize: 12 }} />
                   <YAxis stroke={axisColor} allowDecimals={false} />
                   <Tooltip contentStyle={chartTooltipStyle} />
-                  <Line type="monotone" dataKey="backlog" name="Open backlog" stroke={trendBacklog} strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="backlog" name="Unresolved backlog" stroke={trendBacklog} strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
               <p className="mt-3 text-sm text-slate-400">{backlogSummary}</p>
