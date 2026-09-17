@@ -18,6 +18,7 @@ import com.plantit.repository.ComplaintRepository;
 import com.plantit.repository.EquipmentRepository;
 import com.plantit.repository.LocationRepository;
 import com.plantit.service.ComplaintService;
+import com.plantit.service.support.ComplaintFactory;
 import com.plantit.service.support.ComplaintSummaryMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,18 +81,33 @@ public class ComplaintServiceImpl implements ComplaintService {
         Location newLocation = request.getLocationId() == null ? null
                 : locationRepository.findById(request.getLocationId()).orElseThrow();
 
+        String oldCategoryName = complaint.getCategory() == null ? null : complaint.getCategory().getName();
+        String newCategoryName = newCategory == null ? null : newCategory.getName();
+        String oldLocationName = complaint.getLocation() == null ? null : complaint.getLocation().getName();
+        String newLocationName = newLocation == null ? null : newLocation.getName();
+
+        // Titles are a synthesized "Category complaint from Location" string
+        // (see ComplaintFactory), not derived live from category/location -
+        // so correcting just the category here would otherwise leave the
+        // OLD category name stuck in the title forever. Only regenerate it
+        // when the caller didn't already retype the title themselves
+        // (still exactly what it was before this edit) and the category or
+        // location actually changed - an explicit manual title edit is
+        // always respected, never silently overwritten.
+        boolean titleUntouched = Objects.equals(complaint.getTitle(), request.getTitle());
+        boolean categoryOrLocationChanged = !Objects.equals(oldCategoryName, newCategoryName) || !Objects.equals(oldLocationName, newLocationName);
+        String finalTitle = (titleUntouched && categoryOrLocationChanged)
+                ? ComplaintFactory.composeTitle(newCategoryName, newLocationName)
+                : request.getTitle();
+
         List<String> changes = new ArrayList<>();
-        describeChange(changes, "Title", complaint.getTitle(), request.getTitle());
-        describeChange(changes, "Category",
-                complaint.getCategory() == null ? null : complaint.getCategory().getName(),
-                newCategory == null ? null : newCategory.getName());
+        describeChange(changes, "Title", complaint.getTitle(), finalTitle);
+        describeChange(changes, "Category", oldCategoryName, newCategoryName);
         describeChange(changes, "Equipment",
                 complaint.getEquipment() == null ? null : complaint.getEquipment().getName(),
                 newEquipment == null ? null : newEquipment.getName());
         describeChange(changes, "Equipment reference", complaint.getEquipmentReference(), request.getEquipmentReference());
-        describeChange(changes, "Location",
-                complaint.getLocation() == null ? null : complaint.getLocation().getName(),
-                newLocation == null ? null : newLocation.getName());
+        describeChange(changes, "Location", oldLocationName, newLocationName);
         describeChange(changes, "Priority", complaint.getPriority(), request.getPriority());
         describeChange(changes, "Status", complaint.getStatus(), request.getStatus());
 
@@ -99,7 +115,7 @@ public class ComplaintServiceImpl implements ComplaintService {
             return toDetailDto(complaint);
         }
 
-        complaint.setTitle(request.getTitle());
+        complaint.setTitle(finalTitle);
         complaint.setCategory(newCategory);
         // aiCategory drives future WhatsApp reply correlation (see
         // ComplaintCorrelationService) - keeping it in sync with a manual

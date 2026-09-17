@@ -82,11 +82,19 @@ public class ComplaintFactory {
      * what's used as the title.
      */
     private String buildTitle(ClassificationResult classification, Location location) {
-        String category = classification.getCategory();
-        String categoryLabel = (category == null || category.isBlank() || category.equalsIgnoreCase("Other"))
+        return composeTitle(classification.getCategory(), location != null ? location.getName() : null);
+    }
+
+    /**
+     * The same title pattern, exposed for reuse wherever a complaint's
+     * category or location changes after creation (e.g. a manual edit) -
+     * see ComplaintServiceImpl.updateComplaint, which calls this to keep
+     * the title in sync instead of leaving a stale category name behind.
+     */
+    public static String composeTitle(String categoryName, String locationName) {
+        String categoryLabel = (categoryName == null || categoryName.isBlank() || categoryName.equalsIgnoreCase("Other"))
                 ? "IT"
-                : category;
-        String locationName = location != null ? location.getName() : null;
+                : categoryName;
         if (locationName != null && !locationName.isBlank()) {
             return categoryLabel + " complaint from " + locationName;
         }
