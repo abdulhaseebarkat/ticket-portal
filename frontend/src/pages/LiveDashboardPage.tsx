@@ -10,7 +10,7 @@ import { stripMentionTokens } from '../lib/complaintText';
 import type { ComplaintSummary } from '../types/complaint';
 import { Activity, Building2, CheckCircle2, Clock3, MessageCircle, RefreshCw, ShieldAlert, TrendingUp, User, Wrench } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { statusColors, STATUS_ORDER, trendNew, trendResolved, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
+import { statusColors, STATUS_ORDER, trendNew, trendResolved, kpiAccents, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
 
 type Complaint = ComplaintSummary;
 interface DashboardSummary {
@@ -28,12 +28,12 @@ export function LiveDashboardPage() {
   });
   const complaints = data?.complaints ?? [];
   const kpis = [
-    { label: 'WhatsApp Complaints', value: data?.whatsappComplaints ?? '—', delta: 'From live database', icon: MessageCircle },
-    { label: 'Open Complaints', value: data?.openComplaints ?? '—', delta: 'Current open tickets', icon: ShieldAlert },
-    { label: 'In Progress', value: data?.inProgressComplaints ?? '—', delta: 'Current work queue', icon: Activity },
-    { label: 'Resolved Today', value: data?.resolvedToday ?? '—', delta: 'Resolved since midnight', icon: CheckCircle2 },
-    { label: 'Critical Issues', value: data?.criticalIssues ?? '—', delta: 'Unresolved critical tickets', icon: TrendingUp },
-    { label: 'Avg. Resolution', value: data?.averageResolutionTime ?? '—', delta: 'Report to resolved, all-time', icon: Clock3 },
+    { label: 'WhatsApp Complaints', value: data?.whatsappComplaints ?? '—', delta: 'From live database', icon: MessageCircle, color: kpiAccents.whatsapp },
+    { label: 'Open Complaints', value: data?.openComplaints ?? '—', delta: 'Current open tickets', icon: ShieldAlert, color: kpiAccents.open },
+    { label: 'In Progress', value: data?.inProgressComplaints ?? '—', delta: 'Current work queue', icon: Activity, color: kpiAccents.inProgress },
+    { label: 'Resolved Today', value: data?.resolvedToday ?? '—', delta: 'Resolved since midnight', icon: CheckCircle2, color: kpiAccents.resolved },
+    { label: 'Critical Issues', value: data?.criticalIssues ?? '—', delta: 'Unresolved critical tickets', icon: TrendingUp, color: kpiAccents.critical },
+    { label: 'Avg. Resolution', value: data?.averageResolutionTime ?? '—', delta: 'Report to resolved, all-time', icon: Clock3, color: kpiAccents.avgResolution },
   ];
 
   // "New" buckets by the day a complaint was actually created; "Resolved"
@@ -98,7 +98,7 @@ export function LiveDashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((metric) => (
           <div key={metric.label} className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card">
             <div className="flex items-center justify-between gap-4">
@@ -106,7 +106,10 @@ export function LiveDashboardPage() {
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{metric.label}</p>
                 <div className="mt-4 text-3xl font-semibold text-white">{metric.value}</div>
               </div>
-              <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-3xl bg-slate-900 text-sky-300">
+              <div
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-3xl"
+                style={{ backgroundColor: `${metric.color}22`, color: metric.color }}
+              >
                 <metric.icon className="h-5 w-5" />
               </div>
             </div>

@@ -47,6 +47,19 @@ export const trendResolved = categorical[5]; // green
 // so it needs no legend, just a hue distinct from every status color.
 export const trendBacklog = categorical[6]; // violet
 
+// Dashboard KPI tile icon accents - each tile stands alone (not a shared
+// legend distinguishing series within one chart), so these just need to be
+// individually distinct and pulled from the already-validated categorical
+// set, not re-validated as a group the way a chart's series colors are.
+export const kpiAccents: Record<string, string> = {
+  whatsapp: categorical[0], // blue
+  open: categorical[6], // violet
+  inProgress: categorical[2], // aqua
+  resolved: categorical[5], // green
+  critical: '#d03b3b', // matches severity.critical below - same meaning, same color
+  avgResolution: categorical[1], // orange
+};
+
 // Reserved status/severity palette - never reused for generic series, kept
 // distinct from the categorical set by design. Priority is a severity axis
 // (Low -> Critical), not an identity axis, so it draws from here instead of
