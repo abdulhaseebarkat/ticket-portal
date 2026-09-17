@@ -8,7 +8,7 @@ import { StatusBreakdownModal } from '../components/StatusBreakdownModal';
 import { ComplaintBadge, priorityAccent, priorityStyles, statusStyles } from '../components/ComplaintBadge';
 import { stripMentionTokens } from '../lib/complaintText';
 import type { ComplaintSummary } from '../types/complaint';
-import { Activity, Building2, CheckCircle2, Clock3, MessageCircle, RefreshCw, ShieldAlert, TrendingUp, User, Wrench } from 'lucide-react';
+import { Activity, Building2, CheckCircle2, Clock3, FileText, MessageCircle, RefreshCw, ShieldAlert, TrendingUp, User, Users, Wrench } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { statusColors, STATUS_ORDER, trendNew, trendResolved, kpiAccents, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
 
@@ -122,8 +122,13 @@ export function LiveDashboardPage() {
         <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
           <div className="mb-6 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold text-white">Recent Complaints</h2>
-              <p className="text-sm text-slate-400">{isFetching ? 'Syncing with backend...' : `${filteredComplaints.length} live records`}</p>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300">
+                  <FileText className="h-4 w-4" />
+                </span>
+                <h2 className="text-xl font-semibold text-white">Recent Complaints</h2>
+              </div>
+              <p className="mt-1 text-sm text-slate-400">{isFetching ? 'Syncing with backend...' : `${filteredComplaints.length} live records`}</p>
             </div>
             <div className="flex items-center gap-2">
               <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">Live</span>
@@ -196,8 +201,13 @@ export function LiveDashboardPage() {
 
         <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
           <div className="mb-4">
-            <h2 className="text-xl font-semibold text-white">Status breakdown</h2>
-            <p className="text-sm text-slate-400">Every complaint on record, at a glance - click a status for details</p>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300">
+                <Users className="h-4 w-4" />
+              </span>
+              <h2 className="text-xl font-semibold text-white">Status breakdown</h2>
+            </div>
+            <p className="mt-1 text-sm text-slate-400">Every complaint on record, at a glance - click a status for details</p>
           </div>
           {statusCounts.length === 0 ? (
             <p className="text-slate-400">No status data yet.</p>
