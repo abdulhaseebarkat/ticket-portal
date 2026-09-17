@@ -225,6 +225,7 @@ export function LiveDashboardPage() {
           )}
         </div>
 
+        <div className="flex flex-col gap-5">
         <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
           <div className="mb-4">
             <div className="flex items-center gap-2">
@@ -291,9 +292,8 @@ export function LiveDashboardPage() {
             </div>
           </div>
         </div>
-      </section>
 
-      <section className="grid gap-5 xl:grid-cols-2">
+        <div className="grid grid-cols-2 gap-5">
         <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
           <div className="mb-6 flex items-center gap-2">
             <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300">
@@ -304,11 +304,11 @@ export function LiveDashboardPage() {
           {categoryDistribution.length === 0 ? (
             <p className="text-slate-400">No data yet.</p>
           ) : (
-            <div className="flex flex-col items-center gap-6 sm:flex-row">
-              <div className="relative h-40 w-40 shrink-0">
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative h-32 w-32 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={categoryDistribution} dataKey="value" nameKey="name" innerRadius={50} outerRadius={72} paddingAngle={2} strokeWidth={0}>
+                    <Pie data={categoryDistribution} dataKey="value" nameKey="name" innerRadius={40} outerRadius={58} paddingAngle={2} strokeWidth={0}>
                       {categoryDistribution.map((entry) => (
                         <Cell key={entry.name} fill={entry.color} />
                       ))}
@@ -383,50 +383,52 @@ export function LiveDashboardPage() {
             </div>
           )}
         </div>
-      </section>
-
-      <section className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
-        <div className="mb-5 flex items-center gap-2">
-          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300">
-            <Activity className="h-4 w-4" />
-          </span>
-          <h2 className="text-xl font-semibold text-white">Operations Health</h2>
         </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="flex items-center gap-3">
-            <MessageCircle className="h-5 w-5 shrink-0 text-slate-500" />
-            <div className="min-w-0">
-              <p className="text-xs text-slate-500">WhatsApp Bridge</p>
-              <p className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-medium text-white">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${bridgeDisplay.dotClass}`} />
-                {bridgeStatus?.connected ? 'Connected' : 'Disconnected'}
-              </p>
+
+        <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
+          <div className="mb-5 flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300">
+              <Activity className="h-4 w-4" />
+            </span>
+            <h2 className="text-xl font-semibold text-white">Operations Health</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-3">
+              <MessageCircle className="h-5 w-5 shrink-0 text-slate-500" />
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500">WhatsApp Bridge</p>
+                <p className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-medium text-white">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${bridgeDisplay.dotClass}`} />
+                  {bridgeStatus?.connected ? 'Connected' : 'Disconnected'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Database className="h-5 w-5 shrink-0 text-slate-500" />
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500">PostgreSQL</p>
+                <p className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-medium text-white">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${isError ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                  {isError ? 'Unreachable' : 'Live'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Clock3 className="h-5 w-5 shrink-0 text-slate-500" />
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500">Last Sync</p>
+                <p className="mt-0.5 text-sm font-medium text-white">{dataUpdatedAt ? relativeTime(new Date(dataUpdatedAt).toISOString()) : '—'}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Clock3 className="h-5 w-5 shrink-0 text-slate-500" />
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500">In Progress</p>
+                <p className="mt-0.5 text-sm font-medium text-white">{data?.inProgressComplaints ?? '—'} complaints</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Database className="h-5 w-5 shrink-0 text-slate-500" />
-            <div className="min-w-0">
-              <p className="text-xs text-slate-500">PostgreSQL</p>
-              <p className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-medium text-white">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${isError ? 'bg-rose-400' : 'bg-emerald-400'}`} />
-                {isError ? 'Unreachable' : 'Live'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Clock3 className="h-5 w-5 shrink-0 text-slate-500" />
-            <div className="min-w-0">
-              <p className="text-xs text-slate-500">Last Sync</p>
-              <p className="mt-0.5 text-sm font-medium text-white">{dataUpdatedAt ? relativeTime(new Date(dataUpdatedAt).toISOString()) : '—'}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Clock3 className="h-5 w-5 shrink-0 text-slate-500" />
-            <div className="min-w-0">
-              <p className="text-xs text-slate-500">In Progress</p>
-              <p className="mt-0.5 text-sm font-medium text-white">{data?.inProgressComplaints ?? '—'} complaints</p>
-            </div>
-          </div>
+        </div>
         </div>
       </section>
 
