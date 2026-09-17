@@ -5,8 +5,8 @@
     <artifactId>plant-it-support</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>Plant IT Support Portal</name>
-    <description>Backend for Plant IT Support Portal prototype</description>
+    <name>SLM Tires IT CMS</name>
+    <description>Backend for the SLM Tires IT Complaint Management System (IT CMS)</description>
 
     <properties>
         <java.version>17</java.version>

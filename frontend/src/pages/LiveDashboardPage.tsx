@@ -112,7 +112,7 @@ export function LiveDashboardPage() {
       <section className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-7">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="text-sm uppercase tracking-[0.28em] text-slate-500">Plant IT Operations</div>
+            <div className="text-sm uppercase tracking-[0.28em] text-slate-500">SLM Tires</div>
             <h1 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">Real-time overview of IT complaints</h1>
             <p className="mt-3 max-w-2xl text-slate-400">Live records from PostgreSQL, refreshed every 5 seconds.</p>
           </div>
@@ -399,7 +399,7 @@ export function LiveDashboardPage() {
             <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300">
               <Activity className="h-4 w-4" />
             </span>
-            <h2 className="text-xl font-semibold text-white">Operations Health</h2>
+            <h2 className="text-xl font-semibold text-white">System Health</h2>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center gap-3">

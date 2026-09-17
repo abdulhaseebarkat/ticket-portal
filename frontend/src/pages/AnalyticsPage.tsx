@@ -264,7 +264,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <section className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-7">
-        <div className="text-sm uppercase tracking-[0.28em] text-slate-500">Plant IT Operations</div>
+        <div className="text-sm uppercase tracking-[0.28em] text-slate-500">SLM Tires</div>
         <h1 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">Analytics</h1>
         <p className="mt-3 max-w-2xl text-slate-400">Complete tracking and analysis of complaints - by department, by nature, and over time.</p>
       </section>

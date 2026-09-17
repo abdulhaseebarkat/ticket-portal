@@ -19,7 +19,7 @@ export function Topbar() {
     <header className="border-b border-slate-800 bg-slate-950/95 backdrop-blur-xl sticky top-0 z-30">
       <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-6 py-4">
         <div>
-          <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Plant IT Operations</div>
+          <div className="text-xs uppercase tracking-[0.28em] text-slate-500">SLM Tires</div>
           <div className="text-xl font-semibold text-white">Real-time monitoring & analytics</div>
         </div>
         <div className="flex flex-1 items-center justify-end gap-3">

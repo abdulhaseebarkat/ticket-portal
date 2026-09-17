@@ -19,9 +19,9 @@ export function Sidebar() {
   return (
     <aside className="w-full md:w-72 xl:w-80 border-r border-slate-800 bg-slate-950/90 backdrop-blur-xl">
       <div className="p-6 border-b border-slate-800">
-        <div className="text-sm uppercase tracking-[0.24em] text-slate-400">Plant IT Support</div>
-        <div className="mt-4 text-2xl font-semibold text-white">Portal</div>
-        <div className="mt-2 text-sm text-slate-400">Complaint monitoring & operations dashboard</div>
+        <div className="text-sm uppercase tracking-[0.24em] text-slate-400">SLM Tires</div>
+        <div className="mt-4 text-2xl font-semibold text-white">IT CMS</div>
+        <div className="mt-2 text-sm text-slate-400">Complaint monitoring dashboard</div>
       </div>
       <nav className="p-6 space-y-1">
         {navItems.map((item) => (

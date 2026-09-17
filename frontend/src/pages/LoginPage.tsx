@@ -31,9 +31,9 @@ export default function LoginPage() {
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-950 to-slate-800 p-10 text-white shadow-lg">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.25),_transparent_35%)]" />
           <div className="relative z-10">
-            <div className="text-sm uppercase tracking-[0.3em] text-sky-300/70">Plant IT Support Portal</div>
-            <h1 className="mt-6 text-4xl font-bold leading-tight">IT Complaint Monitoring &amp; Operations Dashboard</h1>
-            <p className="mt-6 max-w-md text-slate-300">This portal provides centralized visibility into WhatsApp-based IT complaints across the plant without changing the field workflow.</p>
+            <div className="text-sm uppercase tracking-[0.3em] text-sky-300/70">SLM Tires</div>
+            <h1 className="mt-6 text-4xl font-bold leading-tight">IT CMS</h1>
+            <p className="mt-6 max-w-md text-slate-300">IT Complaint Management System - centralized visibility into WhatsApp-based IT complaints across the plant, without changing the field workflow.</p>
           </div>
         </div>
 
