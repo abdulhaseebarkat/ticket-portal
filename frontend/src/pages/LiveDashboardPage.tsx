@@ -8,9 +8,9 @@ import { StatusBreakdownModal } from '../components/StatusBreakdownModal';
 import { ComplaintBadge, priorityAccent, priorityStyles, statusStyles } from '../components/ComplaintBadge';
 import { stripMentionTokens } from '../lib/complaintText';
 import type { ComplaintSummary } from '../types/complaint';
-import { Activity, Building2, CheckCircle2, Clock3, FileText, MessageCircle, RefreshCw, ShieldAlert, TrendingUp, User, Users, Wrench } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { statusColors, STATUS_ORDER, trendNew, trendResolved, kpiAccents, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
+import { Activity, AlertTriangle, Building2, CheckCircle2, Clock3, FileText, MessageCircle, PieChart as PieChartIcon, RefreshCw, ShieldAlert, TrendingUp, User, Users, Wrench } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { statusColors, STATUS_ORDER, trendNew, trendResolved, kpiAccents, categorical, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
 
 type Complaint = ComplaintSummary;
 interface DashboardSummary {
@@ -70,6 +70,28 @@ export function LiveDashboardPage() {
   const statusRow = useMemo(
     () => [Object.fromEntries(statusCounts.map(({ status, count }) => [status, count]))],
     [statusCounts]
+  );
+
+  // Category mix, all-time - same "everything on record" scope as Status
+  // breakdown above, not the period selector (which only scopes the
+  // Recent Complaints feed and the top KPI tiles).
+  const categoryDistribution = useMemo(() => {
+    const counts = complaints.reduce<Record<string, number>>((result, item) => {
+      const key = item.category || 'Other';
+      result[key] = (result[key] || 0) + 1;
+      return result;
+    }, {});
+    return Object.entries(counts)
+      .map(([name, value], index) => ({ name, value, color: categorical[index % categorical.length] }))
+      .sort((a, b) => b.value - a.value);
+  }, [complaints]);
+  const categoryTotal = categoryDistribution.reduce((sum, entry) => sum + entry.value, 0);
+
+  // Critical AND still needing attention - a critical complaint that's
+  // already RESOLVED/CLOSED doesn't belong in an "attention" list anymore.
+  const criticalComplaints = useMemo(
+    () => complaints.filter((item) => item.priority === 'CRITICAL' && item.status !== 'RESOLVED' && item.status !== 'CLOSED'),
+    [complaints]
   );
 
   return (
@@ -267,15 +289,95 @@ export function LiveDashboardPage() {
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-white">Want the deeper breakdown?</h2>
-            <p className="text-sm text-slate-400">Category, department, priority, resolution speed, and a filterable trend explorer.</p>
+      <section className="grid gap-5 xl:grid-cols-2">
+        <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
+          <div className="mb-6 flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300">
+              <PieChartIcon className="h-4 w-4" />
+            </span>
+            <h2 className="text-xl font-semibold text-white">Complaint Distribution</h2>
           </div>
-          <button onClick={() => navigate('/analytics')} className="shrink-0 rounded-2xl bg-sky-500 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-sky-400">
-            Open Analytics
-          </button>
+          {categoryDistribution.length === 0 ? (
+            <p className="text-slate-400">No data yet.</p>
+          ) : (
+            <div className="flex flex-col items-center gap-6 sm:flex-row">
+              <div className="relative h-40 w-40 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={categoryDistribution} dataKey="value" nameKey="name" innerRadius={50} outerRadius={72} paddingAngle={2} strokeWidth={0}>
+                      {categoryDistribution.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={chartTooltipStyle} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-semibold text-white">{categoryTotal}</span>
+                  <span className="text-xs uppercase tracking-wide text-slate-500">Total</span>
+                </div>
+              </div>
+              <div className="w-full flex-1 space-y-2">
+                {categoryDistribution.map((entry) => (
+                  <div key={entry.name} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="inline-flex items-center gap-2 text-slate-300">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
+                      {entry.name}
+                    </span>
+                    <span className="font-semibold text-white">{entry.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-[28px] border border-rose-900/40 bg-slate-950/95 p-5 shadow-card sm:p-6">
+          <div className="mb-6 flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-500/15 text-rose-300">
+              <AlertTriangle className="h-4 w-4" />
+            </span>
+            <h2 className="text-xl font-semibold text-white">Critical Attention</h2>
+          </div>
+          {criticalComplaints.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-slate-700 p-6 text-center text-slate-400">No critical tickets right now.</p>
+          ) : (
+            <div className="space-y-3">
+              {criticalComplaints.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setSelectedComplaint(item)}
+                  className="flex w-full items-stretch gap-0 overflow-hidden rounded-[20px] border border-rose-900/40 bg-rose-500/5 text-left transition hover:border-rose-700 hover:bg-rose-500/10"
+                >
+                  <span className="w-1 shrink-0 bg-rose-500" aria-hidden="true" />
+                  <div className="min-w-0 flex-1 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{item.complaintNumber}</span>
+                      <span className="shrink-0 text-xs text-slate-600">{relativeTime(item.createdAt)}</span>
+                    </div>
+                    <h3 className="mt-1.5 line-clamp-1 text-sm font-semibold text-white">{stripMentionTokens(item.title)}</h3>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <ComplaintBadge label={item.priority} styles={priorityStyles} />
+                      <ComplaintBadge label={item.status} styles={statusStyles} />
+                      <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300">{item.category || 'Other'}</span>
+                    </div>
+                    <div className="mt-3 space-y-1.5 text-xs text-slate-400">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                        <span className="truncate">{item.equipment || item.equipmentReference || 'No equipment identified'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                        <span className="truncate">{item.department || 'Unassigned department'}</span>
+                        <span className="text-slate-700">·</span>
+                        <span className="truncate">{item.location || 'Unassigned location'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
