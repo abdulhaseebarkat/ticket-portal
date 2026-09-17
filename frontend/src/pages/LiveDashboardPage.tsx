@@ -7,8 +7,10 @@ import { ComplaintDetailModal } from '../components/ComplaintDetailModal';
 import { StatusBreakdownModal } from '../components/StatusBreakdownModal';
 import { ComplaintBadge, priorityAccent, priorityStyles, statusStyles } from '../components/ComplaintBadge';
 import { stripMentionTokens } from '../lib/complaintText';
+import { useBridgeStatus } from '../hooks/useBridgeStatus';
+import { describeBridgeStatus } from '../lib/bridgeStatusDisplay';
 import type { ComplaintSummary } from '../types/complaint';
-import { Activity, AlertTriangle, Building2, CheckCircle2, Clock3, FileText, MessageCircle, PieChart as PieChartIcon, RefreshCw, ShieldAlert, TrendingUp, User, Users, Wrench } from 'lucide-react';
+import { Activity, AlertTriangle, Building2, CheckCircle2, Clock3, Database, FileText, MessageCircle, PieChart as PieChartIcon, RefreshCw, ShieldAlert, TrendingUp, User, Users, Wrench } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import { statusColors, STATUS_ORDER, trendNew, trendResolved, kpiAccents, categorical, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
 
@@ -23,10 +25,12 @@ export function LiveDashboardPage() {
   const [period, setPeriod] = useState('This Month');
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const { data, isLoading, isFetching, refetch } = useQuery<DashboardSummary>({
+  const { data, isLoading, isFetching, isError, dataUpdatedAt, refetch } = useQuery<DashboardSummary>({
     queryKey: ['dashboardSummary'], queryFn: fetchDashboardSummary, refetchInterval: 5000, refetchOnWindowFocus: true,
   });
   const complaints = data?.complaints ?? [];
+  const { data: bridgeStatus } = useBridgeStatus();
+  const bridgeDisplay = describeBridgeStatus(bridgeStatus);
   const kpis = [
     { label: 'WhatsApp Complaints', value: data?.whatsappComplaints ?? '—', delta: 'From live database', icon: MessageCircle, color: kpiAccents.whatsapp },
     { label: 'Open Complaints', value: data?.openComplaints ?? '—', delta: 'Current open tickets', icon: ShieldAlert, color: kpiAccents.open },
@@ -378,6 +382,51 @@ export function LiveDashboardPage() {
               ))}
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
+        <div className="mb-5 flex items-center gap-2">
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300">
+            <Activity className="h-4 w-4" />
+          </span>
+          <h2 className="text-xl font-semibold text-white">Operations Health</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="flex items-center gap-3">
+            <MessageCircle className="h-5 w-5 shrink-0 text-slate-500" />
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500">WhatsApp Bridge</p>
+              <p className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-medium text-white">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${bridgeDisplay.dotClass}`} />
+                {bridgeStatus?.connected ? 'Connected' : 'Disconnected'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Database className="h-5 w-5 shrink-0 text-slate-500" />
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500">PostgreSQL</p>
+              <p className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-medium text-white">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${isError ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                {isError ? 'Unreachable' : 'Live'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Clock3 className="h-5 w-5 shrink-0 text-slate-500" />
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500">Last Sync</p>
+              <p className="mt-0.5 text-sm font-medium text-white">{dataUpdatedAt ? relativeTime(new Date(dataUpdatedAt).toISOString()) : '—'}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Clock3 className="h-5 w-5 shrink-0 text-slate-500" />
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500">In Progress</p>
+              <p className="mt-0.5 text-sm font-medium text-white">{data?.inProgressComplaints ?? '—'} complaints</p>
+            </div>
+          </div>
         </div>
       </section>
 
