@@ -91,10 +91,8 @@ export function StatusBreakdownModal({
 
   const stats = useMemo(() => {
     const critical = locationComplaints.filter((item) => item.priority === 'CRITICAL').length;
-    const resolvedDurations = locationComplaints.filter((item) => item.resolvedAt).map((item) => new Date(item.resolvedAt!).getTime() - new Date(item.createdAt).getTime());
-    const avgResolutionMs = resolvedDurations.length ? resolvedDurations.reduce((sum, value) => sum + value, 0) / resolvedDurations.length : null;
     const oldestOpenMs = locationComplaints.length ? Math.max(...locationComplaints.map((item) => Date.now() - new Date(item.createdAt).getTime())) : null;
-    return { critical, avgResolutionMs, oldestOpenMs };
+    return { critical, oldestOpenMs };
   }, [locationComplaints]);
 
   const visible = useMemo(() => {
@@ -163,11 +161,7 @@ export function StatusBreakdownModal({
           {selectedLocation && (
             <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               <StatChip icon={ShieldAlert} label="Critical" value={String(stats.critical)} accent={stats.critical > 0} />
-              {stats.avgResolutionMs !== null ? (
-                <StatChip icon={CheckCircle2} label="Avg. resolution" value={formatMs(stats.avgResolutionMs)} />
-              ) : (
-                <StatChip icon={Clock3} label="Oldest" value={stats.oldestOpenMs !== null ? formatMs(stats.oldestOpenMs) : '—'} />
-              )}
+              <StatChip icon={Clock3} label="Oldest" value={stats.oldestOpenMs !== null ? formatMs(stats.oldestOpenMs) : '—'} />
             </div>
           )}
         </div>

@@ -14,6 +14,5 @@ public class DashboardSummaryDto {
     private int inProgressComplaints;
     private int resolvedToday;
     private int criticalIssues;
-    private String averageResolutionTime;
     private List<ComplaintSummaryDto> complaints;
 }

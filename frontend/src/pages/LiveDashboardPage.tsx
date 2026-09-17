@@ -17,7 +17,7 @@ import { statusColors, STATUS_ORDER, trendNew, trendResolved, kpiAccents, catego
 type Complaint = ComplaintSummary;
 interface DashboardSummary {
   whatsappComplaints: number; openComplaints: number; inProgressComplaints: number; resolvedToday: number; criticalIssues: number;
-  averageResolutionTime: string; complaints: Complaint[];
+  complaints: Complaint[];
 }
 
 export function LiveDashboardPage() {
@@ -32,12 +32,11 @@ export function LiveDashboardPage() {
   const { data: bridgeStatus } = useBridgeStatus();
   const bridgeDisplay = describeBridgeStatus(bridgeStatus);
   const kpis = [
-    { label: 'WhatsApp Complaints', value: data?.whatsappComplaints ?? '—', delta: 'From live database', icon: MessageCircle, color: kpiAccents.whatsapp },
+    { label: 'Complaints', value: data?.whatsappComplaints ?? '—', delta: 'From live database', icon: MessageCircle, color: kpiAccents.whatsapp },
     { label: 'Open Complaints', value: data?.openComplaints ?? '—', delta: 'Current open tickets', icon: ShieldAlert, color: kpiAccents.open },
     { label: 'In Progress', value: data?.inProgressComplaints ?? '—', delta: 'Current work queue', icon: Activity, color: kpiAccents.inProgress },
     { label: 'Resolved Today', value: data?.resolvedToday ?? '—', delta: 'Resolved since midnight', icon: CheckCircle2, color: kpiAccents.resolved },
     { label: 'Critical Issues', value: data?.criticalIssues ?? '—', delta: 'Unresolved critical tickets', icon: TrendingUp, color: kpiAccents.critical },
-    { label: 'Avg. Resolution', value: data?.averageResolutionTime ?? '—', delta: 'Report to resolved, all-time', icon: Clock3, color: kpiAccents.avgResolution },
   ];
 
   // "New" buckets by the day a complaint was actually created; "Resolved"

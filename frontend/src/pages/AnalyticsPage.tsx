@@ -4,19 +4,12 @@ import { fetchAllComplaints, fetchLocations } from '../lib/api';
 import { RankedBarChart } from '../components/charts/RankedBarChart';
 import { Heatmap } from '../components/charts/Heatmap';
 import type { ComplaintSummary } from '../types/complaint';
-import { Activity, CheckCircle2, Clock3, ShieldAlert } from 'lucide-react';
+import { Activity, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { categorical, sequentialPrimary, sequentialSecondary, priorityColors, PRIORITY_ORDER, trendNew, trendResolved, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
+import { categorical, sequentialPrimary, priorityColors, PRIORITY_ORDER, trendNew, trendResolved, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
 
 const RANGE_PRESETS = ['Today', 'Last 7 Days', 'Last 30 Days', 'All Time', 'Custom'] as const;
 type RangePreset = (typeof RANGE_PRESETS)[number];
-
-const formatDuration = (minutes: number) => {
-  if (minutes < 60) return `${Math.round(minutes)}m`;
-  const hours = minutes / 60;
-  if (hours < 24) return `${hours.toFixed(1)}h`;
-  return `${(hours / 24).toFixed(1)}d`;
-};
 
 const toDateInputValue = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -84,14 +77,7 @@ export default function AnalyticsPage() {
     // both labeled "Open" again. WAITING/IN_PROGRESS/REOPENED complaints
     // are real too, just not counted under this specific label.
     const open = filteredComplaints.filter((item) => item.status === 'OPEN').length;
-    const resolutionMinutes = filteredComplaints
-      .filter((item) => item.resolvedAt)
-      .map((item) => (new Date(item.resolvedAt as string).getTime() - new Date(item.createdAt).getTime()) / 60000)
-      .filter((minutes) => minutes >= 0);
-    const avgResolution = resolutionMinutes.length
-      ? formatDuration(resolutionMinutes.reduce((sum, minutes) => sum + minutes, 0) / resolutionMinutes.length)
-      : 'No data yet';
-    return { total, open, resolved, avgResolution };
+    return { total, open, resolved };
   }, [filteredComplaints]);
 
   // "New" buckets by the day a complaint was actually created; "Resolved"
@@ -234,21 +220,6 @@ export default function AnalyticsPage() {
     }));
   }, [filteredComplaints]);
 
-  const resolutionByDepartment = useMemo(() => {
-    const buckets: Record<string, number[]> = {};
-    filteredComplaints.forEach((item) => {
-      if (!item.resolvedAt) return;
-      const minutes = (new Date(item.resolvedAt).getTime() - new Date(item.createdAt).getTime()) / 60000;
-      if (minutes < 0) return;
-      const key = item.location || 'Unassigned';
-      buckets[key] ??= [];
-      buckets[key].push(minutes);
-    });
-    return Object.entries(buckets)
-      .map(([name, values]) => ({ name, value: values.reduce((sum, minutes) => sum + minutes, 0) / values.length }))
-      .sort((a, b) => b.value - a.value);
-  }, [filteredComplaints]);
-
   const heatmapRows = departmentData.map((item) => item.name);
   const heatmapColumns = categoryData.map((item) => item.name);
   const heatmapValue = (row: string, column: string) =>
@@ -258,7 +229,6 @@ export default function AnalyticsPage() {
     { label: 'Total in range', value: recap.total, icon: ShieldAlert },
     { label: 'Open', value: recap.open, icon: Activity },
     { label: 'Resolved', value: recap.resolved, icon: CheckCircle2 },
-    { label: 'Avg. Resolution', value: recap.avgResolution, icon: Clock3 },
   ];
 
   return (
@@ -436,25 +406,12 @@ export default function AnalyticsPage() {
             )}
           </section>
 
-          <section className="grid gap-5 xl:grid-cols-2">
-            <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
-              <div className="mb-4">
-                <h2 className="text-xl font-semibold text-white">Complaints by priority</h2>
-                <p className="text-sm text-slate-400">Severity mix for this filter</p>
-              </div>
-              <RankedBarChart data={priorityData} height={180} />
+          <section className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold text-white">Complaints by priority</h2>
+              <p className="text-sm text-slate-400">Severity mix for this filter</p>
             </div>
-            <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
-              <div className="mb-4">
-                <h2 className="text-xl font-semibold text-white">Avg. resolution time by department</h2>
-                <p className="text-sm text-slate-400">How fast issues get closed, per zone</p>
-              </div>
-              {resolutionByDepartment.length === 0 ? (
-                <p className="pt-16 text-center text-slate-400">No resolved complaints in this filter yet.</p>
-              ) : (
-                <RankedBarChart data={resolutionByDepartment} color={sequentialSecondary} valueFormatter={formatDuration} />
-              )}
-            </div>
+            <RankedBarChart data={priorityData} height={180} />
           </section>
         </>
       )}
