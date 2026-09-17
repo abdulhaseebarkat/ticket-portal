@@ -30,7 +30,7 @@ export function Sidebar() {
             to={item.to}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                isActive ? 'bg-slate-800 text-white shadow-card' : 'text-slate-300 hover:bg-slate-900/80 hover:text-white'
+                isActive ? 'bg-sky-500 text-white shadow-card' : 'text-slate-300 hover:bg-slate-900/80 hover:text-white'
               }`
             }
           >
