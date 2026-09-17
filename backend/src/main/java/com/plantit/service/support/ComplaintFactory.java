@@ -15,31 +15,15 @@ import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
 import java.time.Year;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Builds new Complaint records from a classification result. Shared by
  * every ingestion path (simulator, Meta Cloud webhook, and the WhatsApp
  * group bridge) so complaint numbering, category/equipment resolution and
- * title extraction only live in one place.
+ * title generation only live in one place.
  */
 @Component
 public class ComplaintFactory {
-    // Common opening salutations people use before actually describing the
-    // problem (often on their own line, e.g. "Dear sir\nTriplex Extruder
-    // stopped..."). Matched only at the very start of what's left, so a
-    // title never becomes just "Dear sir" while the real complaint sits
-    // one line down - and applied in a loop, since some messages stack more
-    // than one of these ("Dear sir,\nGood morning,\n...").
-    private static final Pattern GREETING_PATTERN = Pattern.compile(
-            "(?i)^\\s*(dear\\s+(sir|madam|team|all|support|concerned|it\\s*team)"
-                    + "|respected\\s+(sir|madam)"
-                    + "|hi|hello|hey"
-                    + "|good\\s+(morning|afternoon|evening)"
-                    + "|assalam\\s*o\\s*alaikum|assalamualaikum|aoa|salam)"
-                    + "[\\s,.:!-]*");
-
     private final CategoryRepository categoryRepository;
     private final EquipmentRepository equipmentRepository;
     private final ComplaintRepository complaintRepository;
@@ -67,7 +51,7 @@ public class ComplaintFactory {
 
         return Complaint.builder()
                 .complaintNumber(generateComplaintNumber(complaintNumberPrefix))
-                .title(extractTitle(messageText))
+                .title(buildTitle(classification, location))
                 .description(messageText)
                 .category(resolveCategory(classification.getCategory()))
                 .equipment(equipment)
@@ -86,49 +70,27 @@ public class ComplaintFactory {
                 .build();
     }
 
-    public String extractTitle(String message) {
-        if (message == null || message.isEmpty()) {
-            return "Complaint";
+    /**
+     * A short, synthesized headline built from structured data - never the
+     * raw message text. The raw WhatsApp message is field-typed, often
+     * mid-shift on a phone: greetings ("Dear sir"), typos, and run-on
+     * sentences are all common, and no amount of truncation logic turns
+     * that into something that reads well as a heading. "Scanner complaint
+     * from Zone A" is always legible; "Dear sir" or a mid-sentence cutoff
+     * never is. The full raw message is still kept verbatim in the
+     * description field - nothing about the original report is lost, only
+     * what's used as the title.
+     */
+    private String buildTitle(ClassificationResult classification, Location location) {
+        String category = classification.getCategory();
+        String categoryLabel = (category == null || category.isBlank() || category.equalsIgnoreCase("Other"))
+                ? "IT"
+                : category;
+        String locationName = location != null ? location.getName() : null;
+        if (locationName != null && !locationName.isBlank()) {
+            return categoryLabel + " complaint from " + locationName;
         }
-        // Skip a leading greeting (if any) so the title reflects the actual
-        // complaint rather than "Dear sir" - but if the message turns out to
-        // be nothing BUT a greeting, fall back to the original text rather
-        // than producing an empty title.
-        String content = stripLeadingGreetings(message);
-        if (content.isBlank()) {
-            content = message;
-        }
-
-        int endIndex = Math.min(content.length(), 80);
-        int newlineIndex = content.indexOf('\n');
-        if (newlineIndex > 0 && newlineIndex < endIndex) {
-            endIndex = newlineIndex;
-        } else if (endIndex < content.length()) {
-            // Actually truncating at the 80-char limit (not stopped by an
-            // earlier newline) - back up to the last word boundary so the
-            // title never ends mid-word (e.g. "...not working pl" cutting
-            // "please" in half) - both as a heading on its own, and because
-            // the frontend derives "what's left to show" by matching this
-            // title against the full message.
-            int lastSpace = content.lastIndexOf(' ', endIndex);
-            if (lastSpace > 0) {
-                endIndex = lastSpace;
-            }
-        }
-        return content.substring(0, endIndex).trim();
-    }
-
-    /** Strips one or more leading greeting lines/phrases, in order - see GREETING_PATTERN. */
-    private String stripLeadingGreetings(String message) {
-        String remaining = message;
-        Matcher matcher = GREETING_PATTERN.matcher(remaining);
-        int guard = 0;
-        while (matcher.lookingAt() && guard < 5) {
-            remaining = remaining.substring(matcher.end());
-            matcher = GREETING_PATTERN.matcher(remaining);
-            guard++;
-        }
-        return remaining.trim();
+        return categoryLabel + " complaint";
     }
 
     /**
