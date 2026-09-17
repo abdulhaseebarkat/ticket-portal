@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAllComplaints } from '../lib/api';
 import { formatDuration, relativeTime } from '../lib/time';
+import { stripMentionTokens } from '../lib/complaintText';
 import { ComplaintDetailModal } from '../components/ComplaintDetailModal';
 import { ComplaintBadge, priorityAccent, priorityStyles, statusStyles } from '../components/ComplaintBadge';
 import type { ComplaintSummary } from '../types/complaint';
@@ -161,7 +162,7 @@ export default function ComplaintsPage() {
                         <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{item.complaintNumber}</span>
                         <span className="shrink-0 text-xs text-slate-600">{relativeTime(item.createdAt)}</span>
                       </div>
-                      <h3 className="mt-2 line-clamp-2 text-base font-semibold text-white">{item.title}</h3>
+                      <h3 className="mt-2 line-clamp-2 text-base font-semibold text-white">{stripMentionTokens(item.title)}</h3>
                       <div className="mt-3 flex flex-wrap items-center gap-1.5">
                         <ComplaintBadge label={item.priority} styles={priorityStyles} />
                         <ComplaintBadge label={item.status} styles={statusStyles} />

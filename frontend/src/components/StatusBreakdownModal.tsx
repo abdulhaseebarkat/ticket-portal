@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { fetchLocations } from '../lib/api';
 import { ComplaintBadge, priorityAccent, priorityStyles } from './ComplaintBadge';
+import { stripMentionTokens } from '../lib/complaintText';
 import { formatDuration, relativeTime } from '../lib/time';
 import { statusColors } from '../lib/chartColors';
 import type { ComplaintSummary } from '../types/complaint';
@@ -244,7 +245,7 @@ export function StatusBreakdownModal({
                           <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{item.complaintNumber}</span>
                           <ComplaintBadge label={item.priority} styles={priorityStyles} />
                         </div>
-                        <h3 className="mt-1.5 line-clamp-1 text-sm font-semibold text-white sm:text-base">{item.title}</h3>
+                        <h3 className="mt-1.5 line-clamp-1 text-sm font-semibold text-white sm:text-base">{stripMentionTokens(item.title)}</h3>
                         <div className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-slate-500">
                           <span className="inline-flex items-center gap-1.5">
                             <Building2 className="h-3.5 w-3.5" /> {item.department || 'Unassigned'}

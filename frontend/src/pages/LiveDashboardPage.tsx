@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { fetchDashboardSummary } from '../lib/api';
-import { relativeTime } from '../lib/time';
+import { formatDuration, relativeTime } from '../lib/time';
 import { ComplaintDetailModal } from '../components/ComplaintDetailModal';
 import { StatusBreakdownModal } from '../components/StatusBreakdownModal';
 import { ComplaintBadge, priorityAccent, priorityStyles, statusStyles } from '../components/ComplaintBadge';
-import { descriptionRemainder } from '../lib/complaintText';
+import { stripMentionTokens } from '../lib/complaintText';
 import type { ComplaintSummary } from '../types/complaint';
-import { Activity, CheckCircle2, ChevronRight, Clock3, MapPin, MessageCircle, RefreshCw, ShieldAlert, TrendingUp, User } from 'lucide-react';
+import { Activity, Building2, CheckCircle2, Clock3, MessageCircle, RefreshCw, ShieldAlert, TrendingUp, User, Wrench } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { statusColors, STATUS_ORDER, trendNew, trendResolved, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
 
@@ -119,7 +119,7 @@ export function LiveDashboardPage() {
         <div className="rounded-[28px] border border-slate-800 bg-slate-950/95 p-5 shadow-card sm:p-6">
           <div className="mb-6 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold text-white">New WhatsApp Complaints</h2>
+              <h2 className="text-xl font-semibold text-white">Recent Complaints</h2>
               <p className="text-sm text-slate-400">{isFetching ? 'Syncing with backend...' : `${filteredComplaints.length} live records`}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -133,49 +133,60 @@ export function LiveDashboardPage() {
             <p className="rounded-2xl border border-dashed border-slate-700 p-6 text-center text-slate-400">No complaints for this period.</p>
           ) : (
             <div className="space-y-3">
-              {filteredComplaints.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setSelectedComplaint(item)}
-                  className="group flex w-full items-stretch gap-0 overflow-hidden rounded-[20px] border border-slate-800 bg-slate-900/95 text-left transition hover:border-slate-700 hover:bg-slate-900"
-                >
-                  <span
-                    className={`w-1 shrink-0 ${priorityAccent[item.priority] || 'bg-slate-600'}`}
-                    aria-hidden="true"
-                  />
-                  <div className="min-w-0 flex-1 p-4 sm:p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{item.complaintNumber}</span>
-                          <ComplaintBadge label={item.priority} styles={priorityStyles} />
-                          <ComplaintBadge label={item.status} styles={statusStyles} />
-                        </div>
-                        <h3 className="mt-2 truncate text-base font-semibold text-white sm:text-lg">{item.title}</h3>
-                        {(() => {
-                          const remainder = descriptionRemainder(item.title, item.description);
-                          return remainder ? <p className="mt-1 line-clamp-2 text-sm text-slate-400">{remainder}</p> : null;
-                        })()}
+              {filteredComplaints.map((item) => {
+                const isResolved = item.status === 'RESOLVED' || item.status === 'CLOSED';
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setSelectedComplaint(item)}
+                    className="flex w-full items-stretch gap-0 overflow-hidden rounded-[20px] border border-slate-800 bg-slate-900/95 text-left transition hover:border-slate-700 hover:bg-slate-900"
+                  >
+                    <span className={`w-1 shrink-0 ${priorityAccent[item.priority] || 'bg-slate-600'}`} aria-hidden="true" />
+                    <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{item.complaintNumber}</span>
+                        <span className="shrink-0 text-xs text-slate-600">{relativeTime(item.createdAt)}</span>
                       </div>
-                      <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-slate-400" />
+                      <h3 className="mt-2 line-clamp-2 text-base font-semibold text-white">{stripMentionTokens(item.title)}</h3>
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                        <ComplaintBadge label={item.priority} styles={priorityStyles} />
+                        <ComplaintBadge label={item.status} styles={statusStyles} />
+                        <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300">{item.category || 'Other'}</span>
+                      </div>
+
+                      <div className="mt-4 space-y-2 border-t border-slate-800 pt-4 text-sm text-slate-400">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                          <span className="truncate">{item.department || 'Unassigned department'}</span>
+                          <span className="text-slate-700">·</span>
+                          <span className="truncate">{item.location || 'Unassigned location'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Wrench className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                          <span className="truncate">{item.equipment || item.equipmentReference || 'No equipment identified'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <User className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                          <span className="truncate">Raised by {item.reporter || 'unknown sender'}</span>
+                        </div>
+                        {isResolved && (
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                            <span className="truncate text-slate-300">Solved by {item.resolvedBy || 'unknown'}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {isResolved && item.resolvedAt && (
+                        <div className="mt-4 flex items-center gap-2 self-start rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
+                          <Clock3 className="h-3.5 w-3.5" />
+                          Resolved in {formatDuration(item.createdAt, item.resolvedAt)}
+                        </div>
+                      )}
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500">
-                      <span className="inline-flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5" /> {item.reporter || 'Unknown sender'}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <MessageCircle className="h-3.5 w-3.5" /> {item.group || 'WhatsApp'}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5" /> {item.location || 'Unassigned'}
-                      </span>
-                      <span className="ml-auto inline-flex items-center gap-1.5 text-slate-600">
-                        <Clock3 className="h-3.5 w-3.5" /> {relativeTime(item.createdAt)}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

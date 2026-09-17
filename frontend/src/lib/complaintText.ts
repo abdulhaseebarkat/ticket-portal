@@ -34,3 +34,16 @@ export function descriptionRemainder(title: string, description?: string | null)
   const remainder = description.slice(cut).trim();
   return remainder.length > 0 ? remainder : null;
 }
+
+/**
+ * WhatsApp's raw message text embeds an @-mention as literally "@" plus
+ * the mentioned person's phone number - it never includes their name in
+ * the message text itself (that's rendered client-side, per-viewer, from
+ * each phone's own contacts). A portal viewer has no way to resolve a
+ * random phone number, so these tokens ("@11867615440993") are pure
+ * visual noise, not information - stripped for DISPLAY only; the raw
+ * stored title/description text is never modified, only what's rendered.
+ */
+export function stripMentionTokens(text: string): string {
+  return text.replace(/@\d{6,}/g, '').replace(/\s{2,}/g, ' ').trim();
+}

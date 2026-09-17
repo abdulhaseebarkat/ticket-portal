@@ -23,7 +23,7 @@ import {
 } from '../lib/api';
 import { PRIORITY_ORDER, STATUS_ORDER, statusColors } from '../lib/chartColors';
 import { ComplaintBadge, priorityAccent, priorityStyles, statusStyles } from './ComplaintBadge';
-import { descriptionRemainder } from '../lib/complaintText';
+import { descriptionRemainder, stripMentionTokens } from '../lib/complaintText';
 import type { ComplaintDetail, ComplaintSummary, ComplaintUpdatePayload } from '../types/complaint';
 
 const RESOLVED_STATUSES = new Set(['RESOLVED', 'CLOSED']);
@@ -102,7 +102,7 @@ export function ComplaintDetailModal({ complaint, onClose }: ComplaintDetailModa
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{complaint.complaintNumber}</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">{complaint.title}</h2>
+              <h2 className="mt-2 text-2xl font-semibold text-white">{stripMentionTokens(complaint.title)}</h2>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {!isEditing && detail && (
@@ -128,7 +128,7 @@ export function ComplaintDetailModal({ complaint, onClose }: ComplaintDetailModa
 
           {remainder && (
             <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{remainder}</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{stripMentionTokens(remainder ?? '')}</p>
             </div>
           )}
 
