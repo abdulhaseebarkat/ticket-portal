@@ -61,7 +61,16 @@ export function LiveDashboardPage() {
     });
     return days.map((day) => ({ date: day.label, new: day.new, resolved: day.resolved }));
   }, [complaints]);
-  const filteredComplaints = complaints.filter(item => period === 'This Month' || Date.now() - new Date(item.createdAt).getTime() <= (period === 'Today' ? 86400000 : 7 * 86400000));
+  // Recent Complaints is an "active work" feed, not a full history - once
+  // something is RESOLVED/CLOSED it drops off here (it's still on the
+  // Complaints page), so this stays useful instead of growing without
+  // bound as the total complaint count climbs.
+  const filteredComplaints = complaints.filter(
+    item =>
+      item.status !== 'RESOLVED' &&
+      item.status !== 'CLOSED' &&
+      (period === 'This Month' || Date.now() - new Date(item.createdAt).getTime() <= (period === 'Today' ? 86400000 : 7 * 86400000))
+  );
 
   // Status breakdown as one horizontal stacked bar - a full picture in a single strip.
   const statusCounts = useMemo(() => {
@@ -154,7 +163,7 @@ export function LiveDashboardPage() {
                 </span>
                 <h2 className="text-xl font-semibold text-white">Recent Complaints</h2>
               </div>
-              <p className="mt-1 text-sm text-slate-400">{isFetching ? 'Syncing with backend...' : `${filteredComplaints.length} live records`}</p>
+              <p className="mt-1 text-sm text-slate-400">{isFetching ? 'Syncing with backend...' : `${filteredComplaints.length} unresolved`}</p>
             </div>
             <div className="flex items-center gap-2">
               <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">Live</span>
