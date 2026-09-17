@@ -1,16 +1,22 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Activity,
   Building2,
   CheckCircle2,
   ClipboardEdit,
+  Clock3,
+  FileText,
+  Image as ImageIcon,
   MapPin,
   MessageCircle,
   MessageSquare,
   Pencil,
   PlusCircle,
   RefreshCcw,
+  Tag,
   User,
+  Users,
   Wrench,
   X,
 } from 'lucide-react';
@@ -24,6 +30,7 @@ import {
 import { PRIORITY_ORDER, STATUS_ORDER, statusColors } from '../lib/chartColors';
 import { ComplaintBadge, priorityAccent, priorityStyles, statusStyles } from './ComplaintBadge';
 import { descriptionRemainder, stripMentionTokens } from '../lib/complaintText';
+import { formatDuration, relativeTime } from '../lib/time';
 import type { ComplaintDetail, ComplaintSummary, ComplaintUpdatePayload } from '../types/complaint';
 
 const RESOLVED_STATUSES = new Set(['RESOLVED', 'CLOSED']);
@@ -33,6 +40,18 @@ const eventMeta: Record<string, { label: string; icon: typeof PlusCircle; dot: s
   STATUS_CHANGE: { label: 'Status changed', icon: RefreshCcw, dot: 'bg-amber-400' },
   COMMENT: { label: 'Reply', icon: MessageSquare, dot: 'bg-slate-500' },
   CORRECTED: { label: 'Manually corrected', icon: ClipboardEdit, dot: 'bg-violet-400' },
+};
+
+// A one-line gloss for each status, shown under the badge in the
+// Resolution/Current Status strip - purely descriptive text, not backed by
+// any workflow state (there's no technician-assignment system yet).
+const statusSubtitle: Record<string, string> = {
+  OPEN: 'Awaiting action',
+  IN_PROGRESS: 'Being worked on',
+  WAITING: 'On hold - waiting on parts or vendor',
+  REOPENED: 'Reopened - needs follow-up',
+  RESOLVED: 'Resolved',
+  CLOSED: 'Closed',
 };
 
 interface ComplaintDetailModalProps {
@@ -93,226 +112,291 @@ export function ComplaintDetailModal({ complaint, onClose }: ComplaintDetailModa
   const resolvedBy = detail?.resolvedBy || complaint.resolvedBy;
   const equipment = complaint.equipment || detail?.equipmentReference || complaint.equipmentReference;
   const remainder = descriptionRemainder(complaint.title, complaint.description);
+  const photos = detail?.imageUrls ?? [];
+  const timeOpenLabel = isResolved ? 'Time to Resolve' : 'Time Open';
+  const timeOpenValue = formatDuration(complaint.createdAt, isResolved && complaint.resolvedAt ? complaint.resolvedAt : new Date().toISOString());
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true">
-      <div className="flex max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-[28px] border border-slate-700 bg-slate-900 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 backdrop-blur-sm" role="dialog" aria-modal="true" onClick={onClose}>
+      <div
+        className="flex h-full w-full max-w-2xl overflow-hidden border-l border-slate-800 bg-slate-950 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
         <span className={`w-1.5 shrink-0 ${priorityAccent[complaint.priority] || 'bg-slate-600'}`} aria-hidden="true" />
-        <div className="min-w-0 flex-1 overflow-y-auto p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{complaint.complaintNumber}</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">{stripMentionTokens(complaint.title)}</h2>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-6 py-4">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300">
+                <FileText className="h-4 w-4" />
+              </span>
+              <h2 className="text-lg font-semibold text-white">Complaint Details</h2>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {!isEditing && detail && (
-                <button
-                  onClick={startEditing}
-                  className="flex items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  Edit
-                </button>
-              )}
-              <button aria-label="Close complaint" onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+            <button aria-label="Close complaint" onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <ComplaintBadge label={complaint.priority} styles={priorityStyles} />
-            <ComplaintBadge label={complaint.status} styles={statusStyles} />
-            <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300">{complaint.category || 'Other'}</span>
-          </div>
-
-          {remainder && (
-            <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{stripMentionTokens(remainder ?? '')}</p>
+          <div className="min-w-0 flex-1 overflow-y-auto p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{complaint.complaintNumber}</p>
+                <h3 className="mt-2 text-xl font-semibold text-white sm:text-2xl">{stripMentionTokens(complaint.title)}</h3>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                  <Clock3 className="h-3.5 w-3.5" /> {relativeTime(complaint.createdAt)}
+                </span>
+                {!isEditing && detail && (
+                  <button
+                    onClick={startEditing}
+                    className="flex items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                )}
+              </div>
             </div>
-          )}
 
-          {isEditing && form ? (
-            <div className="mt-6 space-y-4 rounded-2xl border border-slate-700 bg-slate-950/50 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                Correct what the system got wrong - saved changes show up on the timeline below.
-              </p>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <ComplaintBadge label={complaint.priority} styles={priorityStyles} />
+              <ComplaintBadge label={complaint.status} styles={statusStyles} />
+              <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300">{complaint.category || 'Other'}</span>
+            </div>
 
-              <Field label="Title">
-                <input
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                />
-              </Field>
+            {isEditing && form ? (
+              <div className="mt-6 space-y-4 rounded-2xl border border-slate-700 bg-slate-950/50 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                  Correct what the system got wrong - saved changes show up on the timeline below.
+                </p>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Category">
-                  <select
-                    value={form.categoryId ?? ''}
-                    onChange={(e) => setForm({ ...form, categoryId: toNullableId(e.target.value) })}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                  >
-                    <option value="">Unassigned</option>
-                    {categories?.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Location">
-                  <select
-                    value={form.locationId ?? ''}
-                    onChange={(e) => setForm({ ...form, locationId: toNullableId(e.target.value) })}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                  >
-                    <option value="">Unassigned</option>
-                    {locations?.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Equipment">
-                  <select
-                    value={form.equipmentId ?? ''}
-                    onChange={(e) => setForm({ ...form, equipmentId: toNullableId(e.target.value) })}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                  >
-                    <option value="">Unassigned</option>
-                    {equipmentOptions?.map((eq) => (
-                      <option key={eq.id} value={eq.id}>
-                        {eq.equipmentCode} - {eq.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Equipment reference (free text)">
+                <Field label="Title">
                   <input
-                    value={form.equipmentReference ?? ''}
-                    onChange={(e) => setForm({ ...form, equipmentReference: e.target.value })}
-                    placeholder="e.g. TB-045, not yet in the equipment list"
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder:text-slate-600"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
                   />
                 </Field>
 
-                <Field label="Priority">
-                  <select
-                    value={form.priority}
-                    onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Category">
+                    <select
+                      value={form.categoryId ?? ''}
+                      onChange={(e) => setForm({ ...form, categoryId: toNullableId(e.target.value) })}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    >
+                      <option value="">Unassigned</option>
+                      {categories?.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Location">
+                    <select
+                      value={form.locationId ?? ''}
+                      onChange={(e) => setForm({ ...form, locationId: toNullableId(e.target.value) })}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    >
+                      <option value="">Unassigned</option>
+                      {locations?.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Equipment">
+                    <select
+                      value={form.equipmentId ?? ''}
+                      onChange={(e) => setForm({ ...form, equipmentId: toNullableId(e.target.value) })}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    >
+                      <option value="">Unassigned</option>
+                      {equipmentOptions?.map((eq) => (
+                        <option key={eq.id} value={eq.id}>
+                          {eq.equipmentCode} - {eq.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Equipment reference (free text)">
+                    <input
+                      value={form.equipmentReference ?? ''}
+                      onChange={(e) => setForm({ ...form, equipmentReference: e.target.value })}
+                      placeholder="e.g. TB-045, not yet in the equipment list"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder:text-slate-600"
+                    />
+                  </Field>
+
+                  <Field label="Priority">
+                    <select
+                      value={form.priority}
+                      onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    >
+                      {PRIORITY_ORDER.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Status">
+                    <select
+                      value={form.status}
+                      onChange={(e) => setForm({ ...form, status: e.target.value })}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    >
+                      {STATUS_ORDER.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+
+                {saveMutation.isError && (
+                  <p className="text-sm text-red-400">Couldn&apos;t save that change. Try again.</p>
+                )}
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={cancelEditing}
+                    disabled={saveMutation.isPending}
+                    className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
                   >
-                    {PRIORITY_ORDER.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Status">
-                  <select
-                    value={form.status}
-                    onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => saveMutation.mutate(form)}
+                    disabled={saveMutation.isPending || !form.title.trim()}
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
                   >
-                    {STATUS_ORDER.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                    {saveMutation.isPending ? 'Saving...' : 'Save changes'}
+                  </button>
+                </div>
               </div>
-
-              {saveMutation.isError && (
-                <p className="text-sm text-red-400">Couldn&apos;t save that change. Try again.</p>
-              )}
-
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={cancelEditing}
-                  disabled={saveMutation.isPending}
-                  className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => saveMutation.mutate(form)}
-                  disabled={saveMutation.isPending || !form.title.trim()}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-                >
-                  {saveMutation.isPending ? 'Saving...' : 'Save changes'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-5 divide-y divide-slate-800 overflow-hidden rounded-2xl border border-slate-800">
-              <Fact icon={Building2} label="Department" value={department} secondary={complaint.location} />
-              <Fact icon={Wrench} label="Equipment" value={equipment} />
-              <Fact icon={User} label="Raised by" value={complaint.reporter} fallback="Unknown" />
-              {isResolved && <Fact icon={CheckCircle2} label="Solved by" value={resolvedBy} fallback="Unknown" accent />}
-              <Fact icon={MessageCircle} label="Source" value={complaint.group} secondary={complaint.source} />
-            </div>
-          )}
-
-          {detail?.imageUrls && detail.imageUrls.length > 0 && (
-            <div className="mt-6">
-              <p className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-500">Attached photos</p>
-              <div className="flex flex-wrap gap-3">
-                {detail.imageUrls.map((url) => (
-                  <a key={url} href={url} target="_blank" rel="noreferrer">
-                    <img src={url} alt="Complaint attachment" className="h-24 w-24 rounded-2xl border border-slate-700 object-cover" />
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-6">
-            <p className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-500">Timeline</p>
-            {!detail ? (
-              <p className="text-sm text-slate-500">Loading history...</p>
-            ) : !detail.events || detail.events.length === 0 ? (
-              <p className="text-sm text-slate-500">No activity recorded yet.</p>
             ) : (
-              <div className="space-y-3">
-                {detail.events.map((event, index) => {
-                  const meta = eventMeta[event.eventType] || { label: event.eventType, icon: MessageSquare, dot: 'bg-slate-500' };
-                  const Icon = meta.icon;
-                  const statusColor = event.eventType === 'STATUS_CHANGE' && event.newValue ? statusColors[event.newValue] : undefined;
-                  return (
-                    <div key={index} className="flex gap-3">
-                      <div className="flex shrink-0 flex-col items-center">
-                        <span
-                          className="flex h-7 w-7 items-center justify-center rounded-full"
-                          style={{ backgroundColor: `${statusColor ?? '#334155'}25` }}
-                        >
-                          <Icon className="h-3.5 w-3.5" style={{ color: statusColor ?? '#94a3b8' }} />
-                        </span>
-                        {index < detail.events!.length - 1 && <span className="mt-1 w-px flex-1 bg-slate-800" />}
-                      </div>
-                      <div className="min-w-0 flex-1 rounded-2xl border border-slate-800 bg-slate-950/70 p-3 pb-3.5">
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                          <span className="font-semibold uppercase tracking-[0.16em] text-slate-400">
-                            {meta.label}
-                            {event.eventType === 'STATUS_CHANGE' && event.newValue ? ` → ${event.newValue.replace('_', ' ')}` : ''}
-                          </span>
-                          <span>{new Date(event.createdAt).toLocaleString()}</span>
-                        </div>
-                        {event.description && <p className="mt-2 text-sm text-slate-300">{event.description}</p>}
-                        <p className="mt-1 text-xs text-slate-500">By {event.performedBy || 'Unknown'}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div className="divide-y divide-slate-800 overflow-hidden rounded-2xl border border-slate-800">
+                  <Fact icon={Building2} label="Department" value={department} />
+                  <Fact icon={Wrench} label="Equipment" value={equipment} />
+                  <Fact icon={MapPin} label="Location" value={complaint.location} />
+                  <Fact icon={User} label="Raised by" value={complaint.reporter} fallback="Unknown" />
+                </div>
+                <div className="divide-y divide-slate-800 overflow-hidden rounded-2xl border border-slate-800">
+                  <Fact icon={Activity} label="Priority" value={complaint.priority} />
+                  <Fact icon={Tag} label="Category" value={complaint.category} fallback="Other" />
+                  <Fact icon={MessageCircle} label="Source" value={complaint.source} fallback="WhatsApp" />
+                  <Fact icon={Users} label="Group" value={complaint.group} fallback="Unknown" />
+                  {isResolved && <Fact icon={CheckCircle2} label="Solved by" value={resolvedBy} fallback="Unknown" accent />}
+                </div>
               </div>
             )}
+
+            <div className={`mt-6 grid gap-4 ${photos.length > 0 ? 'sm:grid-cols-[1.4fr_1fr]' : ''}`}>
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+                  <MessageCircle className="h-4 w-4 text-emerald-400" />
+                  Original WhatsApp Message
+                </div>
+                {remainder ? (
+                  <>
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                      <span className="font-medium text-slate-300">{complaint.reporter || 'Unknown sender'}</span>
+                      <span>{relativeTime(complaint.createdAt)}</span>
+                    </div>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{stripMentionTokens(remainder)}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-slate-500">No message text captured.</p>
+                )}
+              </div>
+
+              {photos.length > 0 && (
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+                    <ImageIcon className="h-4 w-4 text-sky-300" />
+                    Attached Photos ({photos.length})
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {photos.map((url) => (
+                      <a key={url} href={url} target="_blank" rel="noreferrer">
+                        <img src={url} alt="Complaint attachment" className="h-24 w-24 rounded-2xl border border-slate-700 object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6">
+              <p className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-500">Timeline</p>
+              {!detail ? (
+                <p className="text-sm text-slate-500">Loading history...</p>
+              ) : !detail.events || detail.events.length === 0 ? (
+                <p className="text-sm text-slate-500">No activity recorded yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {detail.events.map((event, index) => {
+                    const meta = eventMeta[event.eventType] || { label: event.eventType, icon: MessageSquare, dot: 'bg-slate-500' };
+                    const Icon = meta.icon;
+                    const statusColor = event.eventType === 'STATUS_CHANGE' && event.newValue ? statusColors[event.newValue] : undefined;
+                    return (
+                      <div key={index} className="flex gap-3">
+                        <div className="flex shrink-0 flex-col items-center">
+                          <span
+                            className="flex h-7 w-7 items-center justify-center rounded-full"
+                            style={{ backgroundColor: `${statusColor ?? '#334155'}25` }}
+                          >
+                            <Icon className="h-3.5 w-3.5" style={{ color: statusColor ?? '#94a3b8' }} />
+                          </span>
+                          {index < detail.events!.length - 1 && <span className="mt-1 w-px flex-1 bg-slate-800" />}
+                        </div>
+                        <div className="min-w-0 flex-1 rounded-2xl border border-slate-800 bg-slate-950/70 p-3 pb-3.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                            <span className="font-semibold uppercase tracking-[0.16em] text-slate-400">
+                              {meta.label}
+                              {event.eventType === 'STATUS_CHANGE' && event.newValue ? ` → ${event.newValue.replace('_', ' ')}` : ''}
+                            </span>
+                            <span>{new Date(event.createdAt).toLocaleString()}</span>
+                          </div>
+                          {event.description && <p className="mt-2 text-sm text-slate-300">{event.description}</p>}
+                          <p className="mt-1 text-xs text-slate-500">By {event.performedBy || 'Unknown'}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+              <p className="mb-3 text-sm font-semibold text-white">Resolution / Current Status</p>
+              <div className="flex flex-wrap items-center gap-8">
+                <div className="flex items-center gap-3">
+                  <Activity className="h-5 w-5 shrink-0 text-slate-500" />
+                  <div>
+                    <ComplaintBadge label={complaint.status} styles={statusStyles} />
+                    <p className="mt-1 text-xs text-slate-500">{statusSubtitle[complaint.status] || ''}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Clock3 className="h-5 w-5 shrink-0 text-slate-500" />
+                  <div>
+                    <p className="text-xs text-slate-500">{timeOpenLabel}</p>
+                    <p className="text-sm font-medium text-white">{timeOpenValue}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -347,7 +431,7 @@ function Fact({
   return (
     <div className="flex items-center gap-3 bg-slate-900/60 px-4 py-3">
       <Icon className={`h-4 w-4 shrink-0 ${accent ? 'text-emerald-400' : 'text-slate-500'}`} />
-      <span className="w-24 shrink-0 text-xs uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <span className="w-20 shrink-0 text-xs uppercase tracking-[0.12em] text-slate-500">{label}</span>
       <span className={`min-w-0 flex-1 truncate text-sm ${accent ? 'text-emerald-300' : 'text-slate-200'}`}>
         {value || fallback}
         {secondary && <span className="text-slate-500"> · {secondary}</span>}
