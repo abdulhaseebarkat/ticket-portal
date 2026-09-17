@@ -15,6 +15,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
 import java.time.Year;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Builds new Complaint records from a classification result. Shared by
@@ -24,6 +26,20 @@ import java.time.Year;
  */
 @Component
 public class ComplaintFactory {
+    // Common opening salutations people use before actually describing the
+    // problem (often on their own line, e.g. "Dear sir\nTriplex Extruder
+    // stopped..."). Matched only at the very start of what's left, so a
+    // title never becomes just "Dear sir" while the real complaint sits
+    // one line down - and applied in a loop, since some messages stack more
+    // than one of these ("Dear sir,\nGood morning,\n...").
+    private static final Pattern GREETING_PATTERN = Pattern.compile(
+            "(?i)^\\s*(dear\\s+(sir|madam|team|all|support|concerned|it\\s*team)"
+                    + "|respected\\s+(sir|madam)"
+                    + "|hi|hello|hey"
+                    + "|good\\s+(morning|afternoon|evening)"
+                    + "|assalam\\s*o\\s*alaikum|assalamualaikum|aoa|salam)"
+                    + "[\\s,.:!-]*");
+
     private final CategoryRepository categoryRepository;
     private final EquipmentRepository equipmentRepository;
     private final ComplaintRepository complaintRepository;
@@ -74,23 +90,45 @@ public class ComplaintFactory {
         if (message == null || message.isEmpty()) {
             return "Complaint";
         }
-        int endIndex = Math.min(message.length(), 80);
-        int newlineIndex = message.indexOf('\n');
+        // Skip a leading greeting (if any) so the title reflects the actual
+        // complaint rather than "Dear sir" - but if the message turns out to
+        // be nothing BUT a greeting, fall back to the original text rather
+        // than producing an empty title.
+        String content = stripLeadingGreetings(message);
+        if (content.isBlank()) {
+            content = message;
+        }
+
+        int endIndex = Math.min(content.length(), 80);
+        int newlineIndex = content.indexOf('\n');
         if (newlineIndex > 0 && newlineIndex < endIndex) {
             endIndex = newlineIndex;
-        } else if (endIndex < message.length()) {
+        } else if (endIndex < content.length()) {
             // Actually truncating at the 80-char limit (not stopped by an
             // earlier newline) - back up to the last word boundary so the
             // title never ends mid-word (e.g. "...not working pl" cutting
             // "please" in half) - both as a heading on its own, and because
             // the frontend derives "what's left to show" by matching this
-            // exact prefix against the full message.
-            int lastSpace = message.lastIndexOf(' ', endIndex);
+            // title against the full message.
+            int lastSpace = content.lastIndexOf(' ', endIndex);
             if (lastSpace > 0) {
                 endIndex = lastSpace;
             }
         }
-        return message.substring(0, endIndex).trim();
+        return content.substring(0, endIndex).trim();
+    }
+
+    /** Strips one or more leading greeting lines/phrases, in order - see GREETING_PATTERN. */
+    private String stripLeadingGreetings(String message) {
+        String remaining = message;
+        Matcher matcher = GREETING_PATTERN.matcher(remaining);
+        int guard = 0;
+        while (matcher.lookingAt() && guard < 5) {
+            remaining = remaining.substring(matcher.end());
+            matcher = GREETING_PATTERN.matcher(remaining);
+            guard++;
+        }
+        return remaining.trim();
     }
 
     /**
