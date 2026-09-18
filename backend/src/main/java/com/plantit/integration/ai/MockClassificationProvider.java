@@ -20,8 +20,11 @@ public class MockClassificationProvider implements ComplaintClassificationProvid
     // category keyword - e.g. the real backfilled complaint "...production
     // Stopped due to Booking MES System not working..." matches "stopped"
     // and "not working" even though it never says scanner/hmi/printer/etc.
+    // "shut(ting)? down" covers both tenses - a real message ("...camera
+    // monitoring system is shutting down...") was silently dropped as
+    // IRRELEVANT because only the literal "shut down" was matched before.
     private static final Pattern PROBLEM_LANGUAGE_PATTERN = Pattern.compile(
-            "(?i)not working|not printing|not scanning|no internet|no network|stopped|shut down|broken"
+            "(?i)not working|not printing|not scanning|no internet|no network|stopped|shut(ting)? down|broken"
                     + "|error|fault|hang(ing|ed)?|\\bissue\\b|\\bproblem\\b|complaint|crash(ed|ing)?|failed|failure"
                     + "|band ho|band hai|kaam nahi|kharab|kharaab|masla|bandh");
 
