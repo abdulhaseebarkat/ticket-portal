@@ -73,7 +73,14 @@ public class MockClassificationProvider implements ComplaintClassificationProvid
             priority = "HIGH";
             confidence = 0.86;
         }
-        if (normalized.contains("working hai") || normalized.contains("ab working hai") || normalized.contains("kaam kar raha") || normalized.contains("kaam kar rha") || normalized.contains("reconnect") || normalized.contains("fix") || normalized.contains("fixed") || normalized.contains("resolved") || normalized.contains("resolve") || normalized.contains("solved") || normalized.contains("solve") || normalized.contains("masla hal") || normalized.contains("issue hal") || normalized.contains("theek ho gaya") || normalized.contains("theek hogaya") || normalized.contains("problem done") || normalized.contains("ok now") || normalized.contains("okay now") || normalized.contains("ok ab") || normalized.contains("okay ab") || normalized.contains("sahi ab") || normalized.contains("theek ab") || normalized.equals("ok") || normalized.equals("okay") || normalized.equals("done")
+        // Deliberately NOT matching the bare verbs "fix"/"resolve"/"solve" -
+        // a brand new complaint asking "please fix/resolve/solve this" would
+        // otherwise be misread as confirmation it's already done (a real
+        // message, "...resolve this issue..." on Curing machine #25, was
+        // silently dropped this way - "resolve" matched here, so it was
+        // never treated as a new complaint at all). Only the completed-past
+        // forms below are genuine resolution signals.
+        if (normalized.contains("working hai") || normalized.contains("ab working hai") || normalized.contains("kaam kar raha") || normalized.contains("kaam kar rha") || normalized.contains("reconnect") || normalized.contains("fixed") || normalized.contains("resolved") || normalized.contains("solved") || normalized.contains("masla hal") || normalized.contains("issue hal") || normalized.contains("theek ho gaya") || normalized.contains("theek hogaya") || normalized.contains("problem done") || normalized.contains("ok now") || normalized.contains("okay now") || normalized.contains("ok ab") || normalized.contains("okay ab") || normalized.contains("sahi ab") || normalized.contains("theek ab") || normalized.equals("ok") || normalized.equals("okay") || normalized.equals("done")
                 || normalized.contains("working fine") || normalized.contains("working now") || normalized.contains("working properly")
                 || normalized.contains("all good") || normalized.contains("good now") || normalized.contains("sorted")
                 || normalized.contains("back up") || normalized.contains("back online") || normalized.contains("up and running")
