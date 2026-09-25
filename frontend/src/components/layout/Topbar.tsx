@@ -2,6 +2,7 @@ import { Search, Bell, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useBridgeStatus } from '../../hooks/useBridgeStatus';
 import { describeBridgeStatus } from '../../lib/bridgeStatusDisplay';
+import slmLogo from '../../assets/slm-logo.png';
 
 export function Topbar() {
   const [query, setQuery] = useState('');
@@ -18,8 +19,10 @@ export function Topbar() {
   return (
     <header className="border-b border-slate-800 bg-slate-950/95 backdrop-blur-xl sticky top-0 z-30">
       <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-6 py-4">
-        <div>
-          <div className="text-xs uppercase tracking-[0.28em] text-slate-500">SLM Tires</div>
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-white px-3 py-1.5 shadow-sm">
+            <img src={slmLogo} alt="SLM Tires" className="h-7 w-auto" />
+          </div>
           <div className="text-xl font-semibold text-white">Real-time monitoring & analytics</div>
         </div>
         <div className="flex flex-1 items-center justify-end gap-3">

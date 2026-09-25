@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Eye, EyeOff } from 'lucide-react';
+import slmTruck from '../assets/slm-truck.png';
+import slmLogo from '../assets/slm-logo.png';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -26,12 +28,38 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4 py-8">
-      <div className="grid max-w-6xl grid-cols-1 gap-8 rounded-[32px] border border-slate-800 bg-slate-900/95 p-6 shadow-card md:grid-cols-[1.2fr_1fr]">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-950 to-slate-800 p-10 text-white shadow-lg">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.25),_transparent_35%)]" />
+    <div className="relative min-h-screen overflow-hidden bg-black text-slate-100 flex items-center justify-center px-4 py-8">
+      {/* Full-page backdrop: the SLM Tires delivery truck, faded into a dark red/black gradient */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,_rgba(200,16,35,0.22),_transparent_45%)]" />
+      <img
+        src={slmTruck}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none select-none absolute -right-16 bottom-0 w-[52rem] max-w-none opacity-80 md:-right-10"
+        style={{
+          maskImage: 'radial-gradient(ellipse 68% 75% at 55% 55%, black 45%, transparent 85%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 68% 75% at 55% 55%, black 45%, transparent 85%)',
+        }}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/80" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black via-transparent to-transparent" />
+
+      <div className="relative z-10 grid max-w-6xl grid-cols-1 gap-8 rounded-[32px] border border-slate-800 bg-slate-900/95 p-6 shadow-card md:grid-cols-[1.2fr_1fr]">
+        <div className="relative overflow-hidden rounded-3xl bg-black p-10 text-white shadow-lg">
+          {/* Tire-tread pattern, evoking SLM's radial-tire product shots */}
+          <div
+            className="absolute inset-0 opacity-[0.18]"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(115deg, rgba(255,255,255,0.9) 0px, rgba(255,255,255,0.9) 3px, transparent 3px, transparent 22px), repeating-linear-gradient(25deg, rgba(255,255,255,0.9) 0px, rgba(255,255,255,0.9) 3px, transparent 3px, transparent 22px)',
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-black via-black/80 to-red-950/60" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,_rgba(200,16,35,0.45),_transparent_55%)]" />
           <div className="relative z-10">
-            <div className="text-sm uppercase tracking-[0.3em] text-sky-300/70">SLM Tires</div>
+            <div className="inline-block rounded-xl bg-white px-4 py-2.5 shadow-sm">
+              <img src={slmLogo} alt="SLM Tires" className="h-9 w-auto" />
+            </div>
             <h1 className="mt-6 text-4xl font-bold leading-tight">IT CMS</h1>
             <p className="mt-6 max-w-md text-slate-300">IT Complaint Management System - centralized visibility into WhatsApp-based IT complaints across the plant, without changing the field workflow.</p>
           </div>

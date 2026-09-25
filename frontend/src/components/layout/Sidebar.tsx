@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { LogOut, Home, Users, ListChecks, BarChart3, KeyRound, Tags } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { ChangePasswordModal } from '../ChangePasswordModal';
+import slmLogo from '../../assets/slm-logo.png';
 
 const navItems = [
   { label: 'Dashboard', to: '/', icon: Home },
@@ -19,7 +20,9 @@ export function Sidebar() {
   return (
     <aside className="w-full md:w-72 xl:w-80 border-r border-slate-800 bg-slate-950/90 backdrop-blur-xl">
       <div className="p-6 border-b border-slate-800">
-        <div className="text-sm uppercase tracking-[0.24em] text-slate-400">SLM Tires</div>
+        <div className="inline-block rounded-xl bg-white px-3 py-2 shadow-sm">
+          <img src={slmLogo} alt="SLM Tires" className="h-8 w-auto" />
+        </div>
         <div className="mt-4 text-2xl font-semibold text-white">IT CMS</div>
         <div className="mt-2 text-sm text-slate-400">Complaint monitoring dashboard</div>
       </div>
