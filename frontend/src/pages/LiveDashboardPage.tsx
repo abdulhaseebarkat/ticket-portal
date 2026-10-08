@@ -105,17 +105,24 @@ export function LiveDashboardPage() {
   // like "ok now" meaning "it's working for me"; non-staff senders are left
   // out of this chart entirely rather than miscredited to a staff member.
   // Raw sender names sometimes carry decorative Unicode diacritics (e.g.
-  // "Ṁu̇ṅẇȧṙ" for "Munawar"), so names are normalized before matching.
-  const IT_STAFF = ['Haseeb', 'Munawar', 'Farooq'];
+  // "Ṁu̇ṅẇȧṙ" for "Munawar"), so names are normalized before matching - but
+  // normalizing that exact real name drops a letter (-> "munwar", not
+  // "munawar"), confirmed against real server data, so both spellings are
+  // matched explicitly rather than assuming normalization always round-trips.
+  const IT_STAFF: Record<string, string[]> = {
+    Haseeb: ['haseeb'],
+    Munawar: ['munawar', 'munwar'],
+    Farooq: ['farooq'],
+  };
   const resolutionsByStaff = useMemo(() => {
-    const counts: Record<string, number> = Object.fromEntries(IT_STAFF.map((name) => [name, 0]));
+    const counts: Record<string, number> = Object.fromEntries(Object.keys(IT_STAFF).map((name) => [name, 0]));
     complaints.forEach((item) => {
       if ((item.status !== 'RESOLVED' && item.status !== 'CLOSED') || !item.resolvedBy) return;
       const normalized = item.resolvedBy.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-      const match = IT_STAFF.find((name) => normalized.includes(name.toLowerCase()));
-      if (match) counts[match] += 1;
+      const match = Object.entries(IT_STAFF).find(([, aliases]) => aliases.some((alias) => normalized.includes(alias)));
+      if (match) counts[match[0]] += 1;
     });
-    return IT_STAFF.map((name) => ({ name, count: counts[name] })).sort((a, b) => b.count - a.count);
+    return Object.keys(IT_STAFF).map((name) => ({ name, count: counts[name] })).sort((a, b) => b.count - a.count);
   }, [complaints]);
 
   // Critical AND still needing attention - a critical complaint that's
