@@ -55,6 +55,23 @@ app:
     bridge-secret: ${WHATSAPP_BRIDGE_SECRET:demo-bridge-secret}
     # Local folder complaint image attachments are saved to, served at /media/**
     media-storage-path: ${WHATSAPP_MEDIA_PATH:./data/whatsapp-media}
+  classification:
+    # "mock" (built-in keyword classifier), "groq", or "gemini" (both
+    # AI-backed - see GroqClassificationProvider/GeminiClassificationProvider).
+    # Switching back is config-only - no code change needed.
+    provider: ${CLASSIFICATION_PROVIDER:mock}
+  groq:
+    # Required only when classification.provider=groq. Get one free at
+    # console.groq.com - no credit card needed.
+    api-key: ${GROQ_API_KEY:}
+    model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+    timeout-ms: ${GROQ_TIMEOUT_MS:8000}
+  gemini:
+    # Required only when classification.provider=gemini. Get one free at
+    # aistudio.google.com - no credit card needed.
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+    timeout-ms: ${GEMINI_TIMEOUT_MS:8000}
 
 logging:
   level:

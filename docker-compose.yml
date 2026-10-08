@@ -36,6 +36,21 @@ services:
       APP_AUTH_SEED_PASSWORD: ${APP_AUTH_SEED_PASSWORD:-slmtires@123}
       WHATSAPP_BRIDGE_SECRET: ${WHATSAPP_BRIDGE_SECRET:-demo-bridge-secret}
       WHATSAPP_MEDIA_PATH: /data/whatsapp-media
+      # "mock" (default, the built-in keyword classifier), "groq", or
+      # "gemini" (both AI-backed) - set via a real .env file, never
+      # committed. Switching back to mock is config-only, no rebuild of
+      # logic needed.
+      CLASSIFICATION_PROVIDER: ${CLASSIFICATION_PROVIDER:-mock}
+      # Required only when CLASSIFICATION_PROVIDER=groq. Get one free at
+      # console.groq.com - no credit card needed. Never commit a real key.
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      GROQ_TIMEOUT_MS: ${GROQ_TIMEOUT_MS:-8000}
+      # Required only when CLASSIFICATION_PROVIDER=gemini. Get one free at
+      # aistudio.google.com - no credit card needed. Never commit a real key.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      GEMINI_TIMEOUT_MS: ${GEMINI_TIMEOUT_MS:-8000}
     ports:
       - '8080:8080'
     volumes:
