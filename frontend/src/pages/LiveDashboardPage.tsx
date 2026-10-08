@@ -12,7 +12,7 @@ import { describeBridgeStatus } from '../lib/bridgeStatusDisplay';
 import type { ComplaintSummary } from '../types/complaint';
 import { Activity, AlertTriangle, Building2, CheckCircle2, Clock3, Database, FileText, MessageCircle, PieChart as PieChartIcon, RefreshCw, ShieldAlert, TrendingUp, User, Users, Wrench } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
-import { statusColors, STATUS_ORDER, trendNew, trendResolved, kpiAccents, categorical, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
+import { statusColors, STATUS_ORDER, trendNew, trendResolved, kpiAccents, categorical, sequentialPrimary, chartTooltipStyle, axisColor, gridColor } from '../lib/chartColors';
 
 type Complaint = ComplaintSummary;
 interface DashboardSummary {
@@ -98,6 +98,25 @@ export function LiveDashboardPage() {
       .sort((a, b) => b.value - a.value);
   }, [complaints]);
   const categoryTotal = categoryDistribution.reduce((sum, entry) => sum + entry.value, 0);
+
+  // Resolutions per IT staff member, all-time. resolvedBy is whoever sent
+  // the message that triggered "resolved" - almost always the IT staffer
+  // confirming a fix, occasionally the original reporter saying something
+  // like "ok now" meaning "it's working for me"; non-staff senders are left
+  // out of this chart entirely rather than miscredited to a staff member.
+  // Raw sender names sometimes carry decorative Unicode diacritics (e.g.
+  // "Ṁu̇ṅẇȧṙ" for "Munawar"), so names are normalized before matching.
+  const IT_STAFF = ['Haseeb', 'Munawar', 'Farooq'];
+  const resolutionsByStaff = useMemo(() => {
+    const counts: Record<string, number> = Object.fromEntries(IT_STAFF.map((name) => [name, 0]));
+    complaints.forEach((item) => {
+      if ((item.status !== 'RESOLVED' && item.status !== 'CLOSED') || !item.resolvedBy) return;
+      const normalized = item.resolvedBy.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+      const match = IT_STAFF.find((name) => normalized.includes(name.toLowerCase()));
+      if (match) counts[match] += 1;
+    });
+    return IT_STAFF.map((name) => ({ name, count: counts[name] })).sort((a, b) => b.count - a.count);
+  }, [complaints]);
 
   // Critical AND still needing attention - a critical complaint that's
   // already RESOLVED/CLOSED doesn't belong in an "attention" list anymore.
@@ -279,6 +298,25 @@ export function LiveDashboardPage() {
               </div>
             </>
           )}
+
+          <div className="mt-8 border-t border-slate-800 pt-6">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-300">
+                <User className="h-4 w-4" />
+              </span>
+              <h2 className="text-xl font-semibold text-white">Resolutions by IT Staff</h2>
+            </div>
+            <p className="mb-4 mt-1 text-sm text-slate-400">All-time, by who confirmed the fix</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={resolutionsByStaff} barCategoryGap="30%">
+                <CartesianGrid stroke={gridColor} strokeDasharray="4 4" vertical={false} />
+                <XAxis dataKey="name" stroke={axisColor} tickLine={false} axisLine={false} />
+                <YAxis stroke={axisColor} allowDecimals={false} />
+                <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: 'rgba(148, 163, 184, 0.08)' }} />
+                <Bar dataKey="count" fill={sequentialPrimary} radius={[4, 4, 0, 0]} label={{ position: 'top', fill: '#e2e8f0', fontSize: 13 }} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
           <div className="mt-8 border-t border-slate-800 pt-6">
             <h2 className="text-xl font-semibold text-white">New vs Resolved</h2>
