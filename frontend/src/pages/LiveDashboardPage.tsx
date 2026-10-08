@@ -100,19 +100,22 @@ export function LiveDashboardPage() {
   const categoryTotal = categoryDistribution.reduce((sum, entry) => sum + entry.value, 0);
 
   // Resolutions per IT staff member, all-time. resolvedBy is whoever sent
-  // the message that triggered "resolved" - almost always the IT staffer
-  // confirming a fix, occasionally the original reporter saying something
-  // like "ok now" meaning "it's working for me"; non-staff senders are left
-  // out of this chart entirely rather than miscredited to a staff member.
-  // Raw sender names sometimes carry decorative Unicode diacritics (e.g.
-  // "Ṁu̇ṅẇȧṙ" for "Munawar"), so names are normalized before matching - but
-  // normalizing that exact real name drops a letter (-> "munwar", not
-  // "munawar"), confirmed against real server data, so both spellings are
-  // matched explicitly rather than assuming normalization always round-trips.
+  // the message that triggered "resolved" - an IT staffer confirming a fix
+  // over WhatsApp, "IT Support" for a resolution done by hand in the portal
+  // (the shared it.support@slmtires.com login - no record of which person),
+  // or occasionally the original reporter saying something like "ok now"
+  // meaning "it's working for me"; non-staff senders are left out of this
+  // chart entirely rather than miscredited to a staff member. Raw sender
+  // names sometimes carry decorative Unicode diacritics (e.g. "Ṁu̇ṅẇȧṙ" for
+  // "Munawar") or are just an emoji (Farooq's actual WhatsApp display name)
+  // - aliases are matched against the exact real values confirmed from the
+  // server's resolved_by data, not assumed spellings.
   const IT_STAFF: Record<string, string[]> = {
     Haseeb: ['haseeb'],
     Munawar: ['munawar', 'munwar'],
-    Farooq: ['farooq'],
+    Farooq: ['😀'],
+    'Ashfaque Ali': ['ashfaque'],
+    'IT Support': ['it.support@slmtires.com'],
   };
   const resolutionsByStaff = useMemo(() => {
     const counts: Record<string, number> = Object.fromEntries(Object.keys(IT_STAFF).map((name) => [name, 0]));
