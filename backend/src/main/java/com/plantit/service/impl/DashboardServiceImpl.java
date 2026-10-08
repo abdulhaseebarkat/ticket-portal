@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import com.plantit.entity.Complaint;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class DashboardServiceImpl implements DashboardService {
@@ -38,6 +40,14 @@ public class DashboardServiceImpl implements DashboardService {
             .filter(complaint -> !"CLOSED".equalsIgnoreCase(complaint.getStatus()))
             .count();
 
+        // Over ALL resolved/closed complaints, not just the top-20 recent
+        // slice above - a resolver's name is just as likely to sit on an
+        // older, already-closed complaint that window never includes.
+        Map<String, Long> resolutionsByResolver = complaints.stream()
+                .filter(complaint -> "RESOLVED".equalsIgnoreCase(complaint.getStatus()) || "CLOSED".equalsIgnoreCase(complaint.getStatus()))
+                .filter(complaint -> complaint.getResolvedBy() != null && !complaint.getResolvedBy().isBlank())
+                .collect(Collectors.groupingBy(Complaint::getResolvedBy, Collectors.counting()));
+
         return DashboardSummaryDto.builder()
                 .whatsappComplaints(total)
                 .openComplaints(open)
@@ -47,6 +57,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .complaints(complaintRepository.findTop20ByOrderByCreatedAtDesc().stream()
                         .map(complaintSummaryMapper::toSummary)
                         .toList())
+                .resolutionsByResolver(resolutionsByResolver)
                 .build();
     }
 

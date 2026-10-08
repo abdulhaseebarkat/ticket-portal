@@ -18,6 +18,7 @@ type Complaint = ComplaintSummary;
 interface DashboardSummary {
   whatsappComplaints: number; openComplaints: number; inProgressComplaints: number; resolvedToday: number; criticalIssues: number;
   complaints: Complaint[];
+  resolutionsByResolver?: Record<string, number>;
 }
 
 export function LiveDashboardPage() {
@@ -99,17 +100,21 @@ export function LiveDashboardPage() {
   }, [complaints]);
   const categoryTotal = categoryDistribution.reduce((sum, entry) => sum + entry.value, 0);
 
-  // Resolutions per IT staff member, all-time. resolvedBy is whoever sent
-  // the message that triggered "resolved" - an IT staffer confirming a fix
-  // over WhatsApp, "IT Support" for a resolution done by hand in the portal
-  // (the shared it.support@slmtires.com login - no record of which person),
-  // or occasionally the original reporter saying something like "ok now"
-  // meaning "it's working for me"; non-staff senders are left out of this
-  // chart entirely rather than miscredited to a staff member. Raw sender
-  // names sometimes carry decorative Unicode diacritics (e.g. "Ṁu̇ṅẇȧṙ" for
-  // "Munawar") or are just an emoji (Farooq's actual WhatsApp display name)
-  // - aliases are matched against the exact real values confirmed from the
-  // server's resolved_by data, not assumed spellings.
+  // Resolutions per IT staff member, all-time, computed over EVERY resolved
+  // complaint on record (data.resolutionsByResolver, from the backend) -
+  // not the `complaints` array above, which is capped to the 20 most
+  // recently created complaints and silently excludes older, already-closed
+  // ones where most real resolutions actually live. resolvedBy is whoever
+  // sent the message that triggered "resolved" - an IT staffer confirming a
+  // fix over WhatsApp, "IT Support" for a resolution done by hand in the
+  // portal (the shared it.support@slmtires.com login - no record of which
+  // person), or occasionally the original reporter saying something like
+  // "ok now" meaning "it's working for me"; non-staff senders are left out
+  // of this chart entirely rather than miscredited to a staff member. Raw
+  // sender names sometimes carry decorative Unicode diacritics (e.g.
+  // "Ṁu̇ṅẇȧṙ" for "Munawar") or are just an emoji (Farooq's actual WhatsApp
+  // display name) - aliases are matched against the exact real values
+  // confirmed from the server's resolved_by data, not assumed spellings.
   const IT_STAFF: Record<string, string[]> = {
     Haseeb: ['haseeb'],
     Munawar: ['munawar', 'munwar'],
@@ -119,14 +124,13 @@ export function LiveDashboardPage() {
   };
   const resolutionsByStaff = useMemo(() => {
     const counts: Record<string, number> = Object.fromEntries(Object.keys(IT_STAFF).map((name) => [name, 0]));
-    complaints.forEach((item) => {
-      if ((item.status !== 'RESOLVED' && item.status !== 'CLOSED') || !item.resolvedBy) return;
-      const normalized = item.resolvedBy.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    Object.entries(data?.resolutionsByResolver ?? {}).forEach(([resolvedBy, resolvedCount]) => {
+      const normalized = resolvedBy.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
       const match = Object.entries(IT_STAFF).find(([, aliases]) => aliases.some((alias) => normalized.includes(alias)));
-      if (match) counts[match[0]] += 1;
+      if (match) counts[match[0]] += resolvedCount;
     });
     return Object.keys(IT_STAFF).map((name) => ({ name, count: counts[name] })).sort((a, b) => b.count - a.count);
-  }, [complaints]);
+  }, [data?.resolutionsByResolver]);
 
   // Critical AND still needing attention - a critical complaint that's
   // already RESOLVED/CLOSED doesn't belong in an "attention" list anymore.
