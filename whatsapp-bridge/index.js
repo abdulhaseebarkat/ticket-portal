@@ -329,13 +329,21 @@ function extractText(message) {
         message.conversation ||
         message.extendedTextMessage?.text ||
         message.imageMessage?.caption ||
+        // Caption only - the video itself is never downloaded or stored,
+        // same as a plain text message. Without this, a video with a real
+        // complaint written in its caption (a common way to report a
+        // problem - "here's the broken scanner" plus a clip of it failing)
+        // had no text at all by this function's reckoning, and the message
+        // got silently dropped by the !text && !isImage check below instead
+        // of forwarded as the text-only report it effectively is.
+        message.videoMessage?.caption ||
         null
     );
 }
 
 /** The WhatsApp message id being replied to, when the sender used native "reply". */
 function extractQuotedMessageId(message) {
-    const contextInfo = message.extendedTextMessage?.contextInfo || message.imageMessage?.contextInfo || null;
+    const contextInfo = message.extendedTextMessage?.contextInfo || message.imageMessage?.contextInfo || message.videoMessage?.contextInfo || null;
     return contextInfo?.stanzaId || null;
 }
 
