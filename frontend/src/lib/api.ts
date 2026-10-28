@@ -95,6 +95,16 @@ export const updateComplaint = async (id: number, payload: ComplaintUpdatePayloa
   return response.data;
 };
 
+/** Folds `id` into `targetComplaintId` - id's messages/timeline move onto the target, then id is deleted. Returns the target's updated detail. */
+export const mergeComplaint = async (id: number, targetComplaintId: number) => {
+  const response = await api.post(`/complaints/${id}/merge`, { targetComplaintId });
+  return response.data;
+};
+
+export const deleteComplaint = async (id: number) => {
+  await api.delete(`/complaints/${id}`);
+};
+
 export const fetchCategories = async () => {
   const response = await api.get('/categories');
   return response.data as ReferenceOption[];

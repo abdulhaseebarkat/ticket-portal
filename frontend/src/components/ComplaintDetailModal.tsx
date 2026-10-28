@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
+  AlertTriangle,
   Building2,
   CheckCircle2,
   ClipboardEdit,
   Clock3,
   FileText,
+  GitMerge,
   Image as ImageIcon,
   MapPin,
   MessageCircle,
@@ -14,17 +16,22 @@ import {
   Pencil,
   PlusCircle,
   RefreshCcw,
+  Search,
   Tag,
+  Trash2,
   User,
   Users,
   Wrench,
   X,
 } from 'lucide-react';
 import {
+  deleteComplaint,
+  fetchAllComplaints,
   fetchCategories,
   fetchComplaintDetail,
   fetchEquipmentOptions,
   fetchLocations,
+  mergeComplaint,
   updateComplaint,
 } from '../lib/api';
 import { PRIORITY_ORDER, STATUS_ORDER, statusColors } from '../lib/chartColors';
@@ -40,6 +47,7 @@ const eventMeta: Record<string, { label: string; icon: typeof PlusCircle; dot: s
   STATUS_CHANGE: { label: 'Status changed', icon: RefreshCcw, dot: 'bg-amber-400' },
   COMMENT: { label: 'Reply', icon: MessageSquare, dot: 'bg-slate-500' },
   CORRECTED: { label: 'Manually corrected', icon: ClipboardEdit, dot: 'bg-violet-400' },
+  MERGED: { label: 'Merged', icon: GitMerge, dot: 'bg-fuchsia-400' },
 };
 
 // A one-line gloss for each status, shown under the badge in the
@@ -66,6 +74,10 @@ export function ComplaintDetailModal({ complaint, onClose }: ComplaintDetailModa
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState<ComplaintUpdatePayload | null>(null);
+  const [isMerging, setIsMerging] = useState(false);
+  const [mergeSearch, setMergeSearch] = useState('');
+  const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const { data: detail } = useQuery<ComplaintDetail>({
     queryKey: ['complaintDetail', complaint.id],
@@ -77,6 +89,12 @@ export function ComplaintDetailModal({ complaint, onClose }: ComplaintDetailModa
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories, enabled: isEditing });
   const { data: locations } = useQuery({ queryKey: ['locations'], queryFn: fetchLocations, enabled: isEditing });
   const { data: equipmentOptions } = useQuery({ queryKey: ['equipmentOptions'], queryFn: fetchEquipmentOptions, enabled: isEditing });
+  // Same for the merge picker - only fetched once Merge is actually opened.
+  const { data: allComplaints } = useQuery<ComplaintSummary[]>({
+    queryKey: ['complaints'],
+    queryFn: fetchAllComplaints,
+    enabled: isMerging,
+  });
 
   const saveMutation = useMutation({
     mutationFn: (payload: ComplaintUpdatePayload) => updateComplaint(complaint.id, payload),
@@ -87,6 +105,40 @@ export function ComplaintDetailModal({ complaint, onClose }: ComplaintDetailModa
       setForm(null);
     },
   });
+
+  const mergeMutation = useMutation({
+    mutationFn: (targetId: number) => mergeComplaint(complaint.id, targetId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['complaints'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+      onClose();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteComplaint(complaint.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['complaints'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+      onClose();
+    },
+  });
+
+  // Same WhatsApp group first (where a real duplicate almost always is),
+  // then everything else - never itself.
+  const mergeCandidates = useMemo(() => {
+    if (!allComplaints) return [];
+    const term = mergeSearch.trim().toLowerCase();
+    return allComplaints
+      .filter((item) => item.id !== complaint.id)
+      .filter((item) => !term || item.title.toLowerCase().includes(term) || item.complaintNumber.toLowerCase().includes(term))
+      .sort((a, b) => {
+        const aSameGroup = a.group === complaint.group ? 0 : 1;
+        const bSameGroup = b.group === complaint.group ? 0 : 1;
+        return aSameGroup - bSameGroup || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      })
+      .slice(0, 30);
+  }, [allComplaints, mergeSearch, complaint.id, complaint.group]);
 
   const startEditing = () => {
     if (!detail) return;
@@ -100,11 +152,21 @@ export function ComplaintDetailModal({ complaint, onClose }: ComplaintDetailModa
       status: detail.status,
     });
     setIsEditing(true);
+    setIsMerging(false);
+    setIsConfirmingDelete(false);
   };
 
   const cancelEditing = () => {
     setIsEditing(false);
     setForm(null);
+  };
+
+  const startMerging = () => {
+    setIsMerging(true);
+    setIsEditing(false);
+    setIsConfirmingDelete(false);
+    setMergeSearch('');
+    setMergeTargetId(null);
   };
 
   const isResolved = RESOLVED_STATUSES.has(complaint.status);
@@ -146,14 +208,30 @@ export function ComplaintDetailModal({ complaint, onClose }: ComplaintDetailModa
                 <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
                   <Clock3 className="h-3.5 w-3.5" /> {relativeTime(complaint.createdAt)}
                 </span>
-                {!isEditing && detail && (
-                  <button
-                    onClick={startEditing}
-                    className="flex items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Edit
-                  </button>
+                {!isEditing && !isMerging && !isConfirmingDelete && detail && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={startEditing}
+                      className="flex items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={startMerging}
+                      className="flex items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
+                    >
+                      <GitMerge className="h-3.5 w-3.5" />
+                      Merge
+                    </button>
+                    <button
+                      onClick={() => setIsConfirmingDelete(true)}
+                      className="flex items-center gap-1.5 rounded-xl border border-rose-900/50 px-3 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-500/10 hover:text-rose-200"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -280,6 +358,102 @@ export function ComplaintDetailModal({ complaint, onClose }: ComplaintDetailModa
                     className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
                   >
                     {saveMutation.isPending ? 'Saving...' : 'Save changes'}
+                  </button>
+                </div>
+              </div>
+            ) : isMerging ? (
+              <div className="mt-6 space-y-4 rounded-2xl border border-slate-700 bg-slate-950/50 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                  Pick the complaint this one is a duplicate of - its conversation moves there and this one is removed.
+                </p>
+
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <input
+                    value={mergeSearch}
+                    onChange={(e) => setMergeSearch(e.target.value)}
+                    placeholder="Search by title or complaint number..."
+                    autoFocus
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 py-2 pl-9 pr-3 text-sm text-white placeholder:text-slate-600"
+                  />
+                </div>
+
+                <div className="max-h-72 space-y-1.5 overflow-y-auto">
+                  {!allComplaints ? (
+                    <p className="py-4 text-center text-sm text-slate-500">Loading complaints...</p>
+                  ) : mergeCandidates.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-slate-500">No other complaints match.</p>
+                  ) : (
+                    mergeCandidates.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => setMergeTargetId(item.id)}
+                        className={`flex w-full flex-col gap-0.5 rounded-xl border px-3 py-2 text-left transition ${
+                          mergeTargetId === item.id
+                            ? 'border-fuchsia-500 bg-fuchsia-500/10'
+                            : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">{item.complaintNumber}</span>
+                          {item.group === complaint.group && (
+                            <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">Same group</span>
+                          )}
+                        </div>
+                        <span className="truncate text-sm text-white">{stripMentionTokens(item.title)}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {mergeMutation.isError && <p className="text-sm text-red-400">Couldn&apos;t merge that. Try again.</p>}
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setIsMerging(false)}
+                    disabled={mergeMutation.isPending}
+                    className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => mergeTargetId && mergeMutation.mutate(mergeTargetId)}
+                    disabled={mergeMutation.isPending || !mergeTargetId}
+                    className="rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-medium text-white hover:bg-fuchsia-500 disabled:opacity-50"
+                  >
+                    {mergeMutation.isPending ? 'Merging...' : 'Merge'}
+                  </button>
+                </div>
+              </div>
+            ) : isConfirmingDelete ? (
+              <div className="mt-6 space-y-4 rounded-2xl border border-rose-900/50 bg-rose-500/5 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
+                  <div>
+                    <p className="text-sm font-semibold text-white">Delete this complaint permanently?</p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      This removes it and its full message/event history. There&apos;s no undo - if the same issue got reported
+                      twice, Merge is almost always what you want instead.
+                    </p>
+                  </div>
+                </div>
+
+                {deleteMutation.isError && <p className="text-sm text-red-400">Couldn&apos;t delete that. Try again.</p>}
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setIsConfirmingDelete(false)}
+                    disabled={deleteMutation.isPending}
+                    className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => deleteMutation.mutate()}
+                    disabled={deleteMutation.isPending}
+                    className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+                  >
+                    {deleteMutation.isPending ? 'Deleting...' : 'Delete permanently'}
                   </button>
                 </div>
               </div>

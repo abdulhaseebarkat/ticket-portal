@@ -162,6 +162,46 @@ public class ComplaintServiceImpl implements ComplaintService {
         return toDetailDto(complaint);
     }
 
+    @Override
+    @Transactional
+    public ComplaintDetailDto mergeComplaint(Long sourceId, Long targetId, String performedBy) {
+        if (sourceId.equals(targetId)) {
+            throw new IllegalArgumentException("Can't merge a complaint into itself");
+        }
+        Complaint source = complaintRepository.findById(sourceId).orElseThrow();
+        Complaint target = complaintRepository.findById(targetId).orElseThrow();
+
+        List<ComplaintMessage> messages = complaintMessageRepository.findByComplaintIdOrderByCreatedAtAsc(sourceId);
+        messages.forEach(message -> message.setComplaint(target));
+        complaintMessageRepository.saveAll(messages);
+
+        List<ComplaintEvent> events = complaintEventRepository.findByComplaintIdOrderByCreatedAtDesc(sourceId);
+        events.forEach(event -> event.setComplaint(target));
+        complaintEventRepository.saveAll(events);
+
+        complaintEventRepository.save(ComplaintEvent.builder()
+                .complaint(target)
+                .eventType("MERGED")
+                .description("Merged with " + source.getComplaintNumber() + " (" + source.getTitle() + ") - its conversation now appears above.")
+                .performedBy(performedBy)
+                .createdAt(OffsetDateTime.now())
+                .build());
+
+        target.setUpdatedAt(OffsetDateTime.now());
+        complaintRepository.save(target);
+        complaintRepository.delete(source);
+
+        return toDetailDto(target);
+    }
+
+    @Override
+    @Transactional
+    public void deleteComplaint(Long id) {
+        complaintEventRepository.deleteByComplaintId(id);
+        complaintMessageRepository.deleteByComplaintId(id);
+        complaintRepository.deleteById(id);
+    }
+
     private void describeChange(List<String> changes, String label, String oldValue, String newValue) {
         String from = (oldValue == null || oldValue.isBlank()) ? "Unassigned" : oldValue;
         String to = (newValue == null || newValue.isBlank()) ? "Unassigned" : newValue;
